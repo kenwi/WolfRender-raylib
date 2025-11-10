@@ -12,8 +12,9 @@ public class DoorSystem
 {
     private readonly TileLayer _layer;
     private readonly List<Texture2D> _textures;
-    private readonly List<Door> _doors; 
-    
+    private readonly List<Door> _doors;
+    private Vector2 _playerPosition;
+
     public List<Door> Doors => _doors;
 
     public DoorSystem(TileLayer layer, List<Texture2D> textures)
@@ -58,13 +59,13 @@ public class DoorSystem
     
     public void Update(float deltaTime, InputState input, Vector3 playerPosition)
     {
+        _playerPosition = new Vector2(playerPosition.X / 4, playerPosition.Z / 4);
         if (input.IsInteractPressed)
         {
-            var position = new Vector2(playerPosition.X / 4, playerPosition.Z / 4);
-            var closestDoor = FindClosestDoor(position);
+            var closestDoor = FindClosestDoor(_playerPosition);
             if (closestDoor != null)
             {
-                var distanceFromPlayer = Vector2.Distance(position, closestDoor.Position);
+                var distanceFromPlayer = Vector2.Distance(_playerPosition, closestDoor.Position);
                 if (closestDoor != null && distanceFromPlayer < 1.5f)
                 {
                     OpenDoor(closestDoor);
@@ -100,14 +101,29 @@ public class DoorSystem
             {
                 distanceFromPlayer = Math.Abs(position.Y - closestDoor.Position.Y);
                 if (distanceFromPlayer < radius && closestDoor.DoorState != DoorState.OPEN)
+                {
+                    if (position.X + 0.5 < closestDoor.Position.X
+                        || position.X - 0.5 > closestDoor.Position.X)
+                    {
+                        return false;
+                    }
                     return true;
+                    
+                }
             }
 
             if (closestDoor.DoorRotation == DoorRotation.VERTICAL)
             {
                 distanceFromPlayer = Math.Abs(position.X - closestDoor.Position.X);
                 if (distanceFromPlayer < radius && closestDoor.DoorState != DoorState.OPEN)
+                {
+                    if (position.Y + 0.5 < closestDoor.Position.Y
+                        || position.Y - 0.5 > closestDoor.Position.Y)
+                    {
+                        return false;
+                    }
                     return true;
+                }
             }
 
             if (closestDoor.TimeDoorHasBeenOpening > 0.5)
@@ -120,7 +136,7 @@ public class DoorSystem
     {
         foreach(var door in _doors)
         {
-            var distance = Vector2.Distance(door.StartPosition, door.Position);
+            var distanceDoorHasTraveled = Vector2.Distance(door.StartPosition, door.Position);
             switch (door.DoorState)
             {
                 case DoorState.CLOSED:
@@ -134,7 +150,7 @@ public class DoorSystem
                     break;
                 case DoorState.OPENING:
                     door.TimeDoorHasBeenOpening += deltaTime;
-                    if (distance > 1.0f)
+                    if (distanceDoorHasTraveled > 1.0f)
                     {
                         door.DoorState = DoorState.OPEN;
                         break;
@@ -150,12 +166,18 @@ public class DoorSystem
                     }
                     break;
                 case DoorState.CLOSING:
-                    if (distance < 0.01f)
+                    // Avoid closing door on player
+                    var iPlayerPosition = new Vector2((int)(_playerPosition.X + 0.5),  (int)(_playerPosition.Y + 0.5));
+                    var idoorPosition = new Vector2((int)door.StartPosition.X, (int)door.StartPosition.Y);
+                    if (iPlayerPosition == idoorPosition)
+                        break;
+                   
+                    if (distanceDoorHasTraveled < 0.01f)
                     {
                         door.DoorState = DoorState.CLOSED;
                         door.Position = door.StartPosition;
                         door.TimeDoorHasBeenOpen = 0;
-                        // door.TimeDoorHasBeenOpening = 0;
+                        door.TimeDoorHasBeenOpening = 0;
                         break;
                     }
                 
