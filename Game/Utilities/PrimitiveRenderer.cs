@@ -6,6 +6,64 @@ namespace Game.Utilities;
 
 public static class PrimitiveRenderer
 {
+    // Color key for transparency: #980088 (R:152, G:0, B:136)
+    private static readonly Color ColorKey = new Color(152, 0, 136, 255);
+    private static Shader? _colorKeyShader;
+    private static int _colorKeyShaderLoc;
+    
+    private static void EnsureColorKeyShader()
+    {
+        if (_colorKeyShader.HasValue) return;
+        
+        // Fragment shader with color keying (uses default vertex shader from Rlgl)
+        string fragmentShader = @"
+#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+// Input uniform values
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+// Output fragment color
+out vec4 finalColor;
+
+// Color key uniform (RGB values in 0-255 range)
+uniform vec3 colorKey;
+
+void main()
+{
+    vec4 texColor = texture(texture0, fragTexCoord);
+    
+    // Convert texture color to 0-255 range for comparison
+    vec3 texRGB = texColor.rgb * 255.0;
+    
+    // Check if color matches the key color (with small tolerance for compression artifacts)
+    float tolerance = 5.0;
+    if (abs(texRGB.r - colorKey.r) < tolerance &&
+        abs(texRGB.g - colorKey.g) < tolerance &&
+        abs(texRGB.b - colorKey.b) < tolerance)
+    {
+        discard; // Make pixel transparent
+    }
+    
+    finalColor = texColor * colDiffuse * fragColor;
+}";
+
+        // Load shader (Raylib will use default vertex shader)
+        _colorKeyShader = LoadShaderFromMemory(null, fragmentShader);
+        
+        if (_colorKeyShader.HasValue)
+        {
+            _colorKeyShaderLoc = GetShaderLocation(_colorKeyShader.Value, "colorKey");
+            
+            // Set the color key (in 0-255 range for shader)
+            float[] colorKeyArray = { ColorKey.R, ColorKey.G, ColorKey.B };
+            SetShaderValue(_colorKeyShader.Value, _colorKeyShaderLoc, colorKeyArray, ShaderUniformDataType.Vec3);
+        }
+    }
     public static void DrawCubeTexture(
         Texture2D texture,
         Vector3 position,
@@ -268,7 +326,8 @@ public static class PrimitiveRenderer
         Color color,
         float width = 4f,
         float height = 4f,
-        float angle = 4f)
+        float angle = 0f,
+        Rectangle? frameRect = null)
     {
         // Calculate direction from sprite to camera (for billboard effect)
         var directionToCamera = cameraPosition - position;
@@ -284,6 +343,23 @@ public static class PrimitiveRenderer
         {
             directionToCamera = directionToCamera / dirLength;
         }
+        
+        // Quantize direction to 8 discrete angles (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
+        // Calculate angle in XZ plane (0° = +Z, 90° = +X)
+        float angleRad = MathF.Atan2(directionToCamera.X, directionToCamera.Z);
+        
+        // Normalize angle to [0, 2π)
+        if (angleRad < 0) angleRad += 2 * MathF.PI;
+        
+        // Quantize to nearest of 8 directions (45° = π/4 intervals)
+        float quantizedAngleRad = MathF.Round(angleRad / (MathF.PI / 4.0f)) * (MathF.PI / 4.0f);
+        
+        // Reconstruct direction vector from quantized angle
+        directionToCamera = new Vector3(
+            MathF.Sin(quantizedAngleRad),
+            0,
+            MathF.Cos(quantizedAngleRad)
+        );
 
         // Calculate right and up vectors for the billboard
         var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
@@ -319,6 +395,34 @@ public static class PrimitiveRenderer
         var bottomRight = position + halfWidth - halfHeight;
         var bottomLeft = position - halfWidth - halfHeight;
 
+        // Calculate texture coordinates for frame clipping
+        float texLeft, texRight, texTop, texBottom;
+        
+        if (frameRect.HasValue)
+        {
+            var frame = frameRect.Value;
+            // Normalize texture coordinates (0-1 range) based on frame rectangle
+            texLeft = frame.X / texture.Width;
+            texRight = (frame.X + frame.Width) / texture.Width;
+            texTop = frame.Y / texture.Height;
+            texBottom = (frame.Y + frame.Height) / texture.Height;
+        }
+        else
+        {
+            // Use full texture if no frame specified
+            texLeft = 0.0f;
+            texRight = 1.0f;
+            texTop = 0.0f;
+            texBottom = 1.0f;
+        }
+        
+        // Enable color key shader for transparency
+        EnsureColorKeyShader();
+        if (_colorKeyShader.HasValue)
+        {
+            BeginShaderMode(_colorKeyShader.Value);
+        }
+        
         // Draw the quad
         Rlgl.SetTexture(texture.Id);
         Rlgl.Begin(DrawMode.Quads);
@@ -328,24 +432,30 @@ public static class PrimitiveRenderer
         var normal = directionToCamera;
         Rlgl.Normal3f(normal.X, normal.Y, normal.Z);
 
-        // Top-left
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        // Top-left (flip X texture coordinate to fix Y-axis flip)
+        Rlgl.TexCoord2f(texRight, texTop);
         Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
 
         // Top-right
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        Rlgl.TexCoord2f(texLeft, texTop);
         Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);
 
         // Bottom-right
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        Rlgl.TexCoord2f(texLeft, texBottom);
         Rlgl.Vertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
 
         // Bottom-left
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        Rlgl.TexCoord2f(texRight, texBottom);
         Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
 
         Rlgl.End();
         Rlgl.SetTexture(0);
+        
+        // Disable shader
+        if (_colorKeyShader.HasValue)
+        {
+            EndShaderMode();
+        }
     }
 }
 
