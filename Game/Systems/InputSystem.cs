@@ -20,10 +20,12 @@ public class InputSystem
 {
     private bool _isMouseFree = false;
     private bool _isUpdateEnabled = true;
+    private bool _isDebugEnabled = true;
 
     public bool IsMouseFree => _isMouseFree;
     public bool IsUpdateEnabled => _isUpdateEnabled;
-
+    public bool IsDebugEnabled => _isDebugEnabled;
+    
     public void Update()
     {
         if (IsKeyPressed(KeyboardKey.M))
@@ -34,6 +36,11 @@ public class InputSystem
         if (IsKeyPressed(KeyboardKey.U))
         {
             _isUpdateEnabled = !_isUpdateEnabled;
+        }
+
+        if (IsKeyPressed(KeyboardKey.I))
+        {
+            _isDebugEnabled = !_isDebugEnabled;
         }
     }
 

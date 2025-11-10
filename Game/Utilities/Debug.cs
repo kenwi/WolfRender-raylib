@@ -16,8 +16,11 @@ public static class Debug
         rlImGui.Setup(true);
     }
 
-    public static void Draw()
+    public static void Draw(bool isDebugEnabled)
     {
+        if (!isDebugEnabled)
+            return;
+        
         rlImGui.Begin();
         
         // Main debug window
@@ -33,11 +36,12 @@ public static class Debug
             {
                 ImGui.Text("Position:");
                 ImGui.SameLine();
-                ImGui.Text($"X: {Player.Position.X:F2}, Y: {Player.Position.Y:F2}, Z: {Player.Position.Z:F2}");
+                var playerPosition = Player.Position / 4;
+                ImGui.Text($"X: {playerPosition.X:F2}, Y: {playerPosition.Y:F2}, Z: {playerPosition.Z:F2}");
                 
-                ImGui.Text("Old Position:");
-                ImGui.SameLine();
-                ImGui.Text($"X: {Player.OldPosition.X:F2}, Y: {Player.OldPosition.Y:F2}, Z: {Player.OldPosition.Z:F2}");
+                // ImGui.Text("Old Position:");
+                // ImGui.SameLine();
+                // ImGui.Text($"X: {Player.OldPosition.X:F2}, Y: {Player.OldPosition.Y:F2}, Z: {Player.OldPosition.Z:F2}");
                 
                 ImGui.Text("Velocity:");
                 ImGui.SameLine();

@@ -2,6 +2,7 @@ using System.Numerics;
 using Game.Entities;
 using Game.Systems;
 using Game.Utilities;
+using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -87,7 +88,6 @@ public class World
         // Initialize render textures
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player);
-        
     }
 
     public void Update(float deltaTime)
@@ -141,7 +141,8 @@ public class World
         _hudSystem.DrawToScreen(screenWidth, screenHeight);
         DrawFPS(10, GetScreenHeight() - 120);
         
-        Debug.Draw();
+        var isDebugEnabled = _inputSystem.IsDebugEnabled;
+        Debug.Draw(isDebugEnabled);
         
         EndDrawing();
     }
