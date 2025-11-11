@@ -13,6 +13,7 @@ public class DoorSystem
     private readonly TileLayer _layer;
     private readonly List<Texture2D> _textures;
     private readonly List<Door> _doors;
+    private readonly int _quadSize;
     private Vector2 _playerPosition;
 
     public List<Door> Doors => _doors;
@@ -21,15 +22,16 @@ public class DoorSystem
     {
         _layer = layer;
         _textures = textures;
-
         _doors = new List<Door>(20);
+        _quadSize = LevelData.QuadSize;
+
         var ids = _layer.Data.Value.GlobalTileIDs.Value;      
-        for (int index = 0; index < 64 * 64; index++)
+        for (int index = 0; index < LevelData.TileCount; index++)
         {
             var value = ids[index];
             if (ids[index] > 0)
             {
-                var colRow = LevelData.GetColRow(index, 64);
+                var colRow = LevelData.GetColRow(index);
                 var door = new Door()
                 {
                     Position = new Vector2(colRow.col, colRow.row),
@@ -48,18 +50,18 @@ public class DoorSystem
         {
             if (door.DoorRotation == DoorRotation.HORIZONTAL)
             {
-                PrimitiveRenderer.DrawDoorTextureH(_textures[6], new Vector3(door.Position.X * 4, 2, (door.Position.Y - 1) * 4), 4, 4, 4, Raylib_cs.Color.White);
+                PrimitiveRenderer.DrawDoorTextureH(_textures[6], new Vector3(door.Position.X * _quadSize, 2, (door.Position.Y - 1) * _quadSize), _quadSize, _quadSize, _quadSize, Raylib_cs.Color.White);
             }
             else
             {
-                PrimitiveRenderer.DrawDoorTextureV(_textures[6], new Vector3(door.Position.X * 4, 2, door.Position.Y * 4), 4, 4, 4, Raylib_cs.Color.White);
+                PrimitiveRenderer.DrawDoorTextureV(_textures[6], new Vector3(door.Position.X * _quadSize, 2, door.Position.Y * _quadSize), _quadSize, _quadSize, _quadSize, Raylib_cs.Color.White);
             }
         }
     }
     
     public void Update(float deltaTime, InputState input, Vector3 playerPosition)
     {
-        _playerPosition = new Vector2(playerPosition.X / 4, playerPosition.Z / 4);
+        _playerPosition = new Vector2(playerPosition.X / _quadSize, playerPosition.Z / _quadSize);
         if (input.IsInteractPressed)
         {
             var closestDoor = FindClosestDoor(_playerPosition);
@@ -91,7 +93,7 @@ public class DoorSystem
 
     public bool IsDoorBlocking(Vector3 playerPosition, float radius)
     {
-        var position = new Vector2(playerPosition.X / 4, playerPosition.Z / 4);
+        var position = new Vector2(playerPosition.X / _quadSize, playerPosition.Z / _quadSize);
         var closestDoor = FindClosestDoor(position);
         if (closestDoor != null)
         {
@@ -171,7 +173,7 @@ public class DoorSystem
                     var idoorPosition = new Vector2((int)door.StartPosition.X, (int)door.StartPosition.Y);
                     if (iPlayerPosition == idoorPosition)
                         break;
-                   
+
                     if (distanceDoorHasTraveled < 0.01f)
                     {
                         door.DoorState = DoorState.CLOSED;
