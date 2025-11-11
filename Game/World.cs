@@ -22,9 +22,12 @@ public class World
     private readonly DoorSystem _doorSystem;
     private readonly RenderSystem _renderSystem;
     private readonly HudSystem _hudSystem;
+    private readonly AnimationSystem _animationSystem;
 
     // Rendering
     private readonly RenderTexture2D _sceneRenderTexture;
+    private InputState _inputState;
+    private readonly EnemySystem _enemySystem;
 
     public World()
     {
@@ -59,7 +62,8 @@ public class World
             LoadTexture("resources/mossy.png"),
             LoadTexture("resources/redbrick.png"),
             LoadTexture("resources/wood.png"),
-            LoadTexture("resources/door.png")
+            LoadTexture("resources/door.png"),
+            LoadTexture("resources/enemy_guard2.png")
         };
 
         // Initialize player
@@ -84,15 +88,19 @@ public class World
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _textures);
         _hudSystem = new HudSystem(screenWidth, screenHeight);
+        
+        _enemySystem = new EnemySystem(_player, _inputSystem);
+        _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
+        
 
         // Initialize render textures
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
-        Debug.Setup(_doorSystem.Doors, _player);
+        Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
     }
 
     public void Update(float deltaTime)
     {
-        var mouseDelta = _inputSystem.GetInputState().MouseDelta;
+        var mouseDelta = _inputState.MouseDelta;
         
         _inputSystem.LockMouse();
         _inputSystem.Update();
@@ -101,8 +109,10 @@ public class World
 
         _movementSystem.Update(_player, deltaTime);
         _collisionSystem.Update(_player, deltaTime);
-        _cameraSystem.Update(_player, _inputSystem.IsMouseFree, mouseDelta);
-        _doorSystem.Update(deltaTime, _inputSystem.GetInputState(), _player.Position);
+        _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
+        _doorSystem.Update(deltaTime, _inputState, _player.Position);
+        _animationSystem.Update(deltaTime);
+        _enemySystem.Update(deltaTime);
     }
 
     public void Render()
@@ -114,7 +124,8 @@ public class World
 
         _renderSystem.Render(_player);
         _doorSystem.Render();
-
+        _animationSystem.Render();
+        
         EndMode3D();
         EndTextureMode();
 
@@ -127,22 +138,18 @@ public class World
         BeginDrawing();
         ClearBackground(Color.Black);
 
-        int screenWidth = GetScreenWidth();
-        int screenHeight = GetScreenHeight();
-
         DrawTexturePro(
             _sceneRenderTexture.Texture,
             new Rectangle(0, 0, (float)_sceneRenderTexture.Texture.Width, (float)-_sceneRenderTexture.Texture.Height),
-            new Rectangle(0, 0, (float)screenWidth, (float)screenHeight),
+            new Rectangle(0, 0, GetScreenWidth(), GetScreenHeight()),
             new Vector2(0, 0),
             0,
             Color.White);
 
-        _hudSystem.DrawToScreen(screenWidth, screenHeight);
+        // _hudSystem.DrawToScreen(screenWidth, screenHeight);
         DrawFPS(10, GetScreenHeight() - 120);
         
-        var isDebugEnabled = _inputSystem.IsDebugEnabled;
-        Debug.Draw(isDebugEnabled);
+        Debug.Draw(_inputState.IsDebugEnabled);
         
         EndDrawing();
     }
@@ -151,8 +158,10 @@ public class World
     {
         while (!WindowShouldClose())
         {
-            float deltaTime = GetFrameTime();
-            if (_inputSystem.IsUpdateEnabled)
+            var deltaTime = GetFrameTime();
+            _inputState =  _inputSystem.GetInputState();
+            
+            if (_inputState.IsGamePaused)
             {
                 Update(deltaTime);
             }
