@@ -13,19 +13,19 @@ public class InputState
     public bool MoveRight { get; init; }
     public Vector2 MouseDelta { get; init; }
     public bool IsMouseFree { get; init; }
-    public bool IsInteractPressed { get; set; }
+    public bool IsDebugEnabled { get; init; }
+    public bool IsGamePaused { get; init; }
+    public bool IsInteractPressed { get; init; }
+    public bool IsChangeStatePressed { get; init; }
+    public bool IsChangeAnimationPressed { get; set; }
 }
 
 public class InputSystem
 {
     private bool _isMouseFree = false;
-    private bool _isUpdateEnabled = true;
+    private bool _isGamePaused = true;
     private bool _isDebugEnabled = true;
 
-    public bool IsMouseFree => _isMouseFree;
-    public bool IsUpdateEnabled => _isUpdateEnabled;
-    public bool IsDebugEnabled => _isDebugEnabled;
-    
     public void Update()
     {
         if (IsKeyPressed(KeyboardKey.M))
@@ -33,9 +33,9 @@ public class InputSystem
             _isMouseFree = !_isMouseFree;
         }
 
-        if (IsKeyPressed(KeyboardKey.U))
+        if (IsKeyPressed(KeyboardKey.P))
         {
-            _isUpdateEnabled = !_isUpdateEnabled;
+            _isGamePaused = !_isGamePaused;
         }
 
         if (IsKeyPressed(KeyboardKey.I))
@@ -63,7 +63,11 @@ public class InputSystem
             MoveRight = IsKeyDown(KeyboardKey.D),
             MouseDelta = GetMouseDelta(),
             IsMouseFree = _isMouseFree,
-            IsInteractPressed =  IsKeyPressed(KeyboardKey.E)
+            IsGamePaused = _isGamePaused,
+            IsDebugEnabled = _isDebugEnabled,
+            IsInteractPressed =  IsKeyPressed(KeyboardKey.E),
+            IsChangeStatePressed = IsKeyPressed(KeyboardKey.C),
+            IsChangeAnimationPressed = IsKeyPressed(KeyboardKey.V),
         };
     }
 
