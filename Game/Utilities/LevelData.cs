@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using DotTiled;
 
 namespace Game.Utilities;
@@ -8,9 +9,10 @@ public class LevelData
     private readonly TileLayer _floor;
     private readonly TileLayer _ceiling;
     private const int MapWidth = 64;
-
     public int Width => (int)_walls.Width;
     public int Height => (int)_walls.Height;
+    public static int QuadSize => 4;
+    public static int TileCount = MapWidth * MapWidth;
 
     public LevelData(TileLayer walls, TileLayer floor, TileLayer ceiling)
     {
@@ -19,9 +21,9 @@ public class LevelData
         _ceiling = ceiling;
     }
 
-    public static int GetIndex(int col, int row, int width) => width * row + col;
+    public static int GetIndex(int col, int row, int width = LevelData.MapWidth) => width * row + col;
     
-    public static (int col, int row) GetColRow(int index, int width) => (index % width, index / width);
+    public static (int col, int row) GetColRow(int index, int width = LevelData.MapWidth) => (index % width, index / width);
     
     public bool IsWallAt(float worldX, float worldZ)
     {
