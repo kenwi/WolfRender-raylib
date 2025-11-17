@@ -88,6 +88,14 @@ public static class Debug
             }
         }
         
+        // Rendering Information Section
+        if (ImGui.CollapsingHeader("Rendering", ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            ImGui.Text("Drawn Quads:");
+            ImGui.SameLine();
+            ImGui.Text($"{LevelData.DrawedQuads}");
+        }
+        
         // Enemy System Information Section
         if (ImGui.CollapsingHeader($"Enemy System ({_enemySystem?.Enemies?.Count ?? 0})", ImGuiTreeNodeFlags.DefaultOpen))
         {

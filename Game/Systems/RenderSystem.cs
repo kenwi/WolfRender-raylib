@@ -24,6 +24,9 @@ public class RenderSystem
 
     public void Render(Player player)
     {
+        // Reset number of quads that is being drawed
+        LevelData.DrawedQuads = 0;
+        
         Vector3 cameraForward = Vector3.Normalize(player.Camera.Target - player.Camera.Position);
         Vector3 cameraPosXZ = new Vector3(player.Camera.Position.X, 0, player.Camera.Position.Z);
         float drawDistanceWorld = _drawDistance * TileSize;
@@ -50,14 +53,14 @@ public class RenderSystem
 
                 if (dot > _maxAngleDot || distance < 10)
                 {
-                    RenderTile(x, y, tilePos);
+                    RenderTile(x, y, tilePos, player.Camera.Position);
                 }
             }
         }
 
    }
 
-    private void RenderTile(int x, int y, Vector3 worldPos)
+    private void RenderTile(int x, int y, Vector3 worldPos, Vector3 playerPosition)
     {
         // Draw walls
         var wallTile = _level.GetWallTile(x, y);
@@ -67,7 +70,8 @@ public class RenderSystem
                 _textures[(int)wallTile - 1],
                 new Vector3(worldPos.X, 2, worldPos.Z),
                 4.0f, 4.0f, 4.0f,
-                Color.White
+                Color.White,
+                playerPosition
             );
         }
 

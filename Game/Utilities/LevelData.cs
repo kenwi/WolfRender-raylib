@@ -12,6 +12,7 @@ public class LevelData
     public int Width => (int)_walls.Width;
     public int Height => (int)_walls.Height;
     public static int QuadSize => 4;
+    public static int DrawedQuads = 0;
     public static int TileCount = MapWidth * MapWidth;
 
     public LevelData(TileLayer walls, TileLayer floor, TileLayer ceiling)
