@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -64,6 +65,133 @@ void main()
             SetShaderValue(_colorKeyShader.Value, _colorKeyShaderLoc, colorKeyArray, ShaderUniformDataType.Vec3);
         }
     }
+    public static void DrawCubeTexture(
+        Texture2D texture,
+        Vector3 position,
+        float width,
+        float height,
+        float length,
+        Color color,
+        Vector3 playerPosition)
+    {
+        float x = position.X;
+        float y = position.Y;
+        float z = position.Z;
+
+        // Calculate direction from cube center to player (only XZ plane for 2.5D view)
+        Vector3 toPlayer = playerPosition - position;
+        toPlayer.Y = 0; // Ignore Y component for face culling
+        float toPlayerLength = toPlayer.Length();
+        
+        
+        if (toPlayerLength < 0.001f)
+        {
+            // Player is too close, draw all faces as fallback
+            toPlayer = new Vector3(0, 0, 1);
+            toPlayerLength = 1.0f;
+        }
+        
+        Vector3 toPlayerNormalized = toPlayer / toPlayerLength;
+
+        // Face normals (pointing outward)
+        Vector3 frontNormal = new Vector3(0, 0, 1);   // +Z
+        Vector3 backNormal = new Vector3(0, 0, -1);   // -Z
+        Vector3 rightNormal = new Vector3(1, 0, 0);   // +X
+        Vector3 leftNormal = new Vector3(-1, 0, 0);   // -X
+
+        // Calculate dot products to determine which faces are visible
+        // Positive dot = face is facing player
+        float frontDot = Vector3.Dot(frontNormal, toPlayerNormalized);
+        float backDot = Vector3.Dot(backNormal, toPlayerNormalized);
+        float rightDot = Vector3.Dot(rightNormal, toPlayerNormalized);
+        float leftDot = Vector3.Dot(leftNormal, toPlayerNormalized);
+
+        // Find the two faces with highest dot products (most visible)
+        // We'll draw at most 2 faces
+        var faces = new[]
+        {
+            (dot: frontDot, name: "front"),
+            (dot: backDot, name: "back"),
+            (dot: rightDot, name: "right"),
+            (dot: leftDot, name: "left")
+        };
+
+        // Sort by dot product descending and take top 2
+        var visibleFaces = faces.OrderByDescending(f => f.dot).Take(2).ToList();
+        
+        int quadsDrawn = 0;
+
+        Rlgl.SetTexture(texture.Id);
+        Rlgl.Begin(DrawMode.Quads);
+        Rlgl.Color4ub(color.R, color.G, color.B, color.A);
+
+        // Draw only visible faces
+        foreach (var face in visibleFaces)
+        {
+            if (face.name == "front" && face.dot > 0)
+            {
+                // Front Face
+                Rlgl.Normal3f(0.0f, 0.0f, 1.0f);
+                Rlgl.TexCoord2f(0.0f, 0.0f);
+                Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
+                Rlgl.TexCoord2f(1.0f, 0.0f);
+                Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
+                Rlgl.TexCoord2f(1.0f, 1.0f);
+                Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
+                Rlgl.TexCoord2f(0.0f, 1.0f);
+                Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
+                quadsDrawn++;
+            }
+            else if (face.name == "back" && face.dot > 0)
+            {
+                // Back Face
+                Rlgl.Normal3f(0.0f, 0.0f, -1.0f);
+                Rlgl.TexCoord2f(1.0f, 0.0f);
+                Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
+                Rlgl.TexCoord2f(1.0f, 1.0f);
+                Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
+                Rlgl.TexCoord2f(0.0f, 1.0f);
+                Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
+                Rlgl.TexCoord2f(0.0f, 0.0f);
+                Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
+                quadsDrawn++;
+            }
+            else if (face.name == "right" && face.dot > 0)
+            {
+                // Right face
+                Rlgl.Normal3f(1.0f, 0.0f, 0.0f);
+                Rlgl.TexCoord2f(1.0f, 0.0f);
+                Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
+                Rlgl.TexCoord2f(1.0f, 1.0f);
+                Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
+                Rlgl.TexCoord2f(0.0f, 1.0f);
+                Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
+                Rlgl.TexCoord2f(0.0f, 0.0f);
+                Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
+                quadsDrawn++;
+            }
+            else if (face.name == "left" && face.dot > 0)
+            {
+                // Left Face
+                Rlgl.Normal3f(-1.0f, 0.0f, 0.0f);
+                Rlgl.TexCoord2f(0.0f, 0.0f);
+                Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
+                Rlgl.TexCoord2f(1.0f, 0.0f);
+                Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
+                Rlgl.TexCoord2f(1.0f, 1.0f);
+                Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
+                Rlgl.TexCoord2f(0.0f, 1.0f);
+                Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
+                quadsDrawn++;
+            }
+        }
+
+        Rlgl.End();
+        Rlgl.SetTexture(0);
+        
+        LevelData.DrawedQuads += quadsDrawn;
+    }
+    
     public static void DrawCubeTexture(
         Texture2D texture,
         Vector3 position,
@@ -179,6 +307,8 @@ void main()
 
         Rlgl.End();
         Rlgl.SetTexture(0);
+        
+        LevelData.DrawedQuads += 1;
     }
 
     public static void DrawCeilingTexture(
@@ -210,6 +340,8 @@ void main()
 
         Rlgl.End();
         Rlgl.SetTexture(0);
+        
+        LevelData.DrawedQuads += 1;
     }
 
     public static void DrawDoorTextureH(
@@ -252,6 +384,8 @@ void main()
 
         Rlgl.End();
         Rlgl.SetTexture(0);
+        
+        LevelData.DrawedQuads += 2;
     }
 
     public static void DrawDoorTextureV(
@@ -317,6 +451,8 @@ void main()
 
         Rlgl.End();
         Rlgl.SetTexture(0);
+        
+        LevelData.DrawedQuads += 2;
     }
 
     public static void DrawSpriteTexture(
@@ -456,6 +592,8 @@ void main()
         {
             EndShaderMode();
         }
+        
+        LevelData.DrawedQuads += 1;
     }
 }
 
