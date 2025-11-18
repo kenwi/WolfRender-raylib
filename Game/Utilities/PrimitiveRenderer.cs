@@ -12,6 +12,14 @@ public static class PrimitiveRenderer
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;
     
+    // Distance-based lighting shader
+    private static Shader? _lightingShader;
+    private static int _lightingShaderPlayerPosLoc;
+    private static int _lightingShaderMaxDistanceLoc;
+    private static int _lightingShaderMinBrightnessLoc;
+    private static float _maxLightDistance = 1.0f; // Maximum distance for full brightness
+    private static float _minBrightness = 0.0f; // Minimum brightness at max distance
+    
     private static void EnsureColorKeyShader()
     {
         if (_colorKeyShader.HasValue) return;
@@ -64,6 +72,124 @@ void main()
             float[] colorKeyArray = { ColorKey.R, ColorKey.G, ColorKey.B };
             SetShaderValue(_colorKeyShader.Value, _colorKeyShaderLoc, colorKeyArray, ShaderUniformDataType.Vec3);
         }
+    }
+    
+    private static void EnsureLightingShader()
+    {
+        if (_lightingShader.HasValue) return;
+        
+        // Fragment shader with distance-based lighting
+        string fragmentShader = @"
+#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+in vec3 fragWorldPos; // World position passed from vertex shader
+
+// Input uniform values
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+// Output fragment color
+out vec4 finalColor;
+
+// Lighting uniforms
+uniform vec3 playerPosition;      // Player position in world space
+uniform float maxLightDistance;   // Maximum distance for full brightness
+uniform float minBrightness;      // Minimum brightness (0-1)
+
+void main()
+{
+    vec4 texColor = texture(texture0, fragTexCoord);
+    
+    // Calculate distance from player to this pixel's world position
+    float distance = length(fragWorldPos - playerPosition);
+    
+    // Calculate brightness based on distance (exponential falloff)
+    // Uses exponential decay: brightness = e^(-distance/falloffFactor)
+    // At distance 0: brightness = 1.0
+    // As distance increases: brightness decays exponentially
+    float brightness = 1.0;
+    if (distance > 0.0 && maxLightDistance > 0.0)
+    {
+        // Exponential falloff: exp(-distance / (maxLightDistance / 1.0))
+        // The division by 3.0 makes the falloff happen over a reasonable range
+        // At maxLightDistance: exp(-3) ≈ 0.05, so we scale and add minBrightness
+        float falloffFactor = maxLightDistance / 3.0;
+        float expBrightness = exp(-distance / falloffFactor);
+        
+        // Scale from [0, 1] to [minBrightness, 1.0]
+        brightness = expBrightness * (1.0 - minBrightness) + minBrightness;
+        brightness = clamp(brightness, minBrightness, 1.0);
+    }
+    
+    // Apply brightness to color
+    vec3 litColor = texColor.rgb * brightness;
+    
+    finalColor = vec4(litColor, texColor.a) * colDiffuse * fragColor;
+}";
+
+        // Vertex shader that passes world position
+        // Note: Since we pass world positions directly to Rlgl, vertexPosition is already in world space
+        string vertexShader = @"
+#version 330
+
+// Input vertex attributes
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+
+// Outputs to fragment shader
+out vec2 fragTexCoord;
+out vec4 fragColor;
+out vec3 fragWorldPos;
+
+// Uniforms
+uniform mat4 mvp;
+
+void main()
+{
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+    
+    // Vertex position is already in world space (we pass world coords directly)
+    fragWorldPos = vertexPosition;
+    
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}";
+
+        _lightingShader = LoadShaderFromMemory(vertexShader, fragmentShader);
+        
+        if (_lightingShader.HasValue)
+        {
+            _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");
+            _lightingShaderMaxDistanceLoc = GetShaderLocation(_lightingShader.Value, "maxLightDistance");
+            _lightingShaderMinBrightnessLoc = GetShaderLocation(_lightingShader.Value, "minBrightness");
+            
+            // Set default values
+            SetShaderValue(_lightingShader.Value, _lightingShaderMaxDistanceLoc, _maxLightDistance, ShaderUniformDataType.Float);
+            SetShaderValue(_lightingShader.Value, _lightingShaderMinBrightnessLoc, _minBrightness, ShaderUniformDataType.Float);
+        }
+    }
+    
+    public static void SetLightingParameters(Vector3 playerPosition, float maxDistance = 50.0f, float minBrightness = 0.1f)
+    {
+        EnsureLightingShader();
+        if (_lightingShader.HasValue)
+        {
+            float[] playerPosArray = { playerPosition.X, playerPosition.Y, playerPosition.Z };
+            SetShaderValue(_lightingShader.Value, _lightingShaderPlayerPosLoc, playerPosArray, ShaderUniformDataType.Vec3);
+            SetShaderValue(_lightingShader.Value, _lightingShaderMaxDistanceLoc, maxDistance, ShaderUniformDataType.Float);
+            SetShaderValue(_lightingShader.Value, _lightingShaderMinBrightnessLoc, minBrightness, ShaderUniformDataType.Float);
+        }
+    }
+    
+    public static Shader? GetLightingShader()
+    {
+        EnsureLightingShader();
+        return _lightingShader;
     }
     public static void DrawCubeTexture(
         Texture2D texture,

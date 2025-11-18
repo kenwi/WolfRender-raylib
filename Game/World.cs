@@ -118,14 +118,30 @@ public class World
 
     public void Render()
     {
+        // Update lighting shader with current player position
+        PrimitiveRenderer.SetLightingParameters(_player.Position, maxDistance: 50.0f, minBrightness: 0.1f);
+        var lightingShader = PrimitiveRenderer.GetLightingShader();
+        
         // Render 3D scene
         BeginTextureMode(_sceneRenderTexture);
         BeginMode3D(_player.Camera);
-        ClearBackground(Color.RayWhite);
+        ClearBackground(Color.Black);
+        
+        // Enable lighting shader
+        if (lightingShader.HasValue)
+        {
+            BeginShaderMode(lightingShader.Value);
+        }
 
         _renderSystem.Render(_player);
         _doorSystem.Render();
         _animationSystem.Render();
+        
+        // Disable lighting shader
+        if (lightingShader.HasValue)
+        {
+            EndShaderMode();
+        }
         
         EndMode3D();
         EndTextureMode();
