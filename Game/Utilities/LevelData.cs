@@ -1,7 +1,14 @@
 using System.ComponentModel;
+using System.Numerics;
 using DotTiled;
 
 namespace Game.Utilities;
+
+public static class RenderData
+{
+    public static Vector2 Resolution = new Vector2(1025, 411);
+    public static int ResolutionDownScaleMultiplier = 4;
+}
 
 public class LevelData
 {

@@ -33,12 +33,13 @@ public class World
     {
         // Initialize Raylib
         // SetConfigFlags(ConfigFlags.VSyncHint);
-        // SetTargetFPS(120);
+        SetTargetFPS(120);
         InitWindow(0, 0, "");
         SetWindowState(ConfigFlags.ResizableWindow);
-
-        int screenWidth = GetScreenWidth() / 4;
-        int screenHeight = GetScreenHeight() / 4;
+        
+        RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
+        int screenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
+        int screenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
 
         // Load level
         var loader = DotTiled.Serialization.Loader.Default();

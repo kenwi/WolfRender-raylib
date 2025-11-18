@@ -94,6 +94,8 @@ public static class Debug
             ImGui.Text("Drawn Quads:");
             ImGui.SameLine();
             ImGui.Text($"{LevelData.DrawedQuads}");
+            
+            ImGui.Text($"Resolution: Width: {RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier} Height: {RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier}");
         }
         
         // Enemy System Information Section
