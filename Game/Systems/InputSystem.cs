@@ -18,6 +18,7 @@ public class InputState
     public bool IsInteractPressed { get; init; }
     public bool IsChangeStatePressed { get; init; }
     public bool IsChangeAnimationPressed { get; set; }
+    public bool IsMinimapEnabled { get; set; }
 }
 
 public class InputSystem
@@ -25,10 +26,11 @@ public class InputSystem
     private bool _isMouseFree = false;
     private bool _isGamePaused = true;
     private bool _isDebugEnabled = true;
+    private bool _isMinimapEnabled = true;
 
     public void Update()
     {
-        if (IsKeyPressed(KeyboardKey.M))
+        if (IsKeyPressed(KeyboardKey.L))
         {
             _isMouseFree = !_isMouseFree;
         }
@@ -41,6 +43,11 @@ public class InputSystem
         if (IsKeyPressed(KeyboardKey.I))
         {
             _isDebugEnabled = !_isDebugEnabled;
+        }
+
+        if (IsKeyPressed(KeyboardKey.M))
+        {
+            _isMinimapEnabled = !_isMinimapEnabled;
         }
     }
 
@@ -65,6 +72,7 @@ public class InputSystem
             IsMouseFree = _isMouseFree,
             IsGamePaused = _isGamePaused,
             IsDebugEnabled = _isDebugEnabled,
+            IsMinimapEnabled = _isMinimapEnabled,
             IsInteractPressed =  IsKeyPressed(KeyboardKey.E),
             IsChangeStatePressed = IsKeyPressed(KeyboardKey.C),
             IsChangeAnimationPressed = IsKeyPressed(KeyboardKey.V),

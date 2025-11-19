@@ -23,6 +23,7 @@ public class World
     private readonly RenderSystem _renderSystem;
     private readonly HudSystem _hudSystem;
     private readonly AnimationSystem _animationSystem;
+    private readonly MinimapSystem _minimapSystem;
 
     // Rendering
     private readonly RenderTexture2D _sceneRenderTexture;
@@ -89,6 +90,7 @@ public class World
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _textures);
         _hudSystem = new HudSystem(screenWidth, screenHeight);
+        _minimapSystem = new MinimapSystem(_level, _renderSystem);
         
         _enemySystem = new EnemySystem(_player, _inputSystem);
         _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
@@ -165,6 +167,12 @@ public class World
 
         // _hudSystem.DrawToScreen(screenWidth, screenHeight);
         DrawFPS(10, GetScreenHeight() - 120);
+        
+        if (_inputState.IsMinimapEnabled)
+        {
+            // Render minimap
+            _minimapSystem.Render(_player);
+        }
         
         Debug.Draw(_inputState.IsDebugEnabled);
         

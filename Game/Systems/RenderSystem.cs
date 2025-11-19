@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using Game.Entities;
 using Game.Utilities;
@@ -13,6 +14,11 @@ public class RenderSystem
     private readonly float _drawDistance;
     private readonly float _maxAngleDot;
     private const float TileSize = 4.0f;
+    
+    // Track rendered tiles for minimap
+    private HashSet<(int x, int y)> _renderedTiles = new HashSet<(int x, int y)>();
+    
+    public HashSet<(int x, int y)> RenderedTiles => _renderedTiles;
 
     public RenderSystem(LevelData level, List<Texture2D> textures, float drawDistance = 15.0f, float maxAngleDot = 0.4f)
     {
@@ -26,6 +32,9 @@ public class RenderSystem
     {
         // Reset number of quads that is being drawed
         LevelData.DrawedQuads = 0;
+        
+        // Clear rendered tiles tracking
+        _renderedTiles.Clear();
         
         Vector3 cameraForward = Vector3.Normalize(player.Camera.Target - player.Camera.Position);
         Vector3 cameraPosXZ = new Vector3(player.Camera.Position.X, 0, player.Camera.Position.Z);
@@ -54,6 +63,8 @@ public class RenderSystem
                 if (dot > _maxAngleDot || distance < 10)
                 {
                     RenderTile(x, y, tilePos, player.Camera.Position);
+                    // Track that this tile was rendered
+                    _renderedTiles.Add((x, y));
                 }
             }
         }
