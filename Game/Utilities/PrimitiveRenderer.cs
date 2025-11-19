@@ -23,47 +23,10 @@ public static class PrimitiveRenderer
     private static void EnsureColorKeyShader()
     {
         if (_colorKeyShader.HasValue) return;
-        
-        // Fragment shader with color keying (uses default vertex shader from Rlgl)
-        string fragmentShader = @"
-#version 330
-
-// Input vertex attributes (from vertex shader)
-in vec2 fragTexCoord;
-in vec4 fragColor;
-
-// Input uniform values
-uniform sampler2D texture0;
-uniform vec4 colDiffuse;
-
-// Output fragment color
-out vec4 finalColor;
-
-// Color key uniform (RGB values in 0-255 range)
-uniform vec3 colorKey;
-
-void main()
-{
-    vec4 texColor = texture(texture0, fragTexCoord);
-    
-    // Convert texture color to 0-255 range for comparison
-    vec3 texRGB = texColor.rgb * 255.0;
-    
-    // Check if color matches the key color (with small tolerance for compression artifacts)
-    float tolerance = 5.0;
-    if (abs(texRGB.r - colorKey.r) < tolerance &&
-        abs(texRGB.g - colorKey.g) < tolerance &&
-        abs(texRGB.b - colorKey.b) < tolerance)
-    {
-        discard; // Make pixel transparent
-    }
-    
-    finalColor = texColor * colDiffuse * fragColor;
-}";
-
+ 
         // Load shader (Raylib will use default vertex shader)
-        _colorKeyShader = LoadShaderFromMemory(null, fragmentShader);
-        
+        // _colorKeyShader = LoadShaderFromMemory(null, fragmentShader);
+        _colorKeyShader = LoadShader(null, "resources/shaders/transparency.fs");
         if (_colorKeyShader.HasValue)
         {
             _colorKeyShaderLoc = GetShaderLocation(_colorKeyShader.Value, "colorKey");
@@ -77,92 +40,9 @@ void main()
     private static void EnsureLightingShader()
     {
         if (_lightingShader.HasValue) return;
-        
-        // Fragment shader with distance-based lighting
-        string fragmentShader = @"
-#version 330
 
-// Input vertex attributes (from vertex shader)
-in vec2 fragTexCoord;
-in vec4 fragColor;
-in vec3 fragWorldPos; // World position passed from vertex shader
-
-// Input uniform values
-uniform sampler2D texture0;
-uniform vec4 colDiffuse;
-
-// Output fragment color
-out vec4 finalColor;
-
-// Lighting uniforms
-uniform vec3 playerPosition;      // Player position in world space
-uniform float maxLightDistance;   // Maximum distance for full brightness
-uniform float minBrightness;      // Minimum brightness (0-1)
-
-void main()
-{
-    vec4 texColor = texture(texture0, fragTexCoord);
-    
-    // Calculate distance from player to this pixel's world position
-    float distance = length(fragWorldPos - playerPosition);
-    
-    // Calculate brightness based on distance (exponential falloff)
-    // Uses exponential decay: brightness = e^(-distance/falloffFactor)
-    // At distance 0: brightness = 1.0
-    // As distance increases: brightness decays exponentially
-    float brightness = 1.0;
-    if (distance > 0.0 && maxLightDistance > 0.0)
-    {
-        // Exponential falloff: exp(-distance / (maxLightDistance / 1.0))
-        // The division by 3.0 makes the falloff happen over a reasonable range
-        // At maxLightDistance: exp(-3) ≈ 0.05, so we scale and add minBrightness
-        float falloffFactor = maxLightDistance / 3.0;
-        float expBrightness = exp(-distance / falloffFactor);
-        
-        // Scale from [0, 1] to [minBrightness, 1.0]
-        brightness = expBrightness * (1.0 - minBrightness) + minBrightness;
-        brightness = clamp(brightness, minBrightness, 1.0);
-    }
-    
-    // Apply brightness to color
-    vec3 litColor = texColor.rgb * brightness;
-    
-    finalColor = vec4(litColor, texColor.a) * colDiffuse * fragColor;
-}";
-
-        // Vertex shader that passes world position
-        // Note: Since we pass world positions directly to Rlgl, vertexPosition is already in world space
-        string vertexShader = @"
-#version 330
-
-// Input vertex attributes
-in vec3 vertexPosition;
-in vec2 vertexTexCoord;
-in vec3 vertexNormal;
-in vec4 vertexColor;
-
-// Outputs to fragment shader
-out vec2 fragTexCoord;
-out vec4 fragColor;
-out vec3 fragWorldPos;
-
-// Uniforms
-uniform mat4 mvp;
-
-void main()
-{
-    fragTexCoord = vertexTexCoord;
-    fragColor = vertexColor;
-    
-    // Vertex position is already in world space (we pass world coords directly)
-    fragWorldPos = vertexPosition;
-    
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
-}";
-
-        _lightingShader = LoadShaderFromMemory(vertexShader, fragmentShader);
-        
-        if (_lightingShader.HasValue)
+        _lightingShader = LoadShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
+        // if (_lightingShader.HasValue)
         {
             _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");
             _lightingShaderMaxDistanceLoc = GetShaderLocation(_lightingShader.Value, "maxLightDistance");
