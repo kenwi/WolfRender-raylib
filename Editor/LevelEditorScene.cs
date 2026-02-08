@@ -47,6 +47,12 @@ public class LevelEditorScene : IScene
     // Pre-rendered rotated door texture for palette display
     private RenderTexture2D _rotatedDoorTexture;
 
+    // GUI scaling
+    private float _guiScale = 1.5f;
+    private const float MinGuiScale = 0.5f;
+    private const float MaxGuiScale = 4.0f;
+    private const float GuiScaleStep = 0.25f;
+
     // File dialog state
     private bool _showSaveDialog;
     private bool _showLoadJsonDialog;
@@ -154,6 +160,23 @@ public class LevelEditorScene : IScene
         // Paint tiles / place enemies with left mouse button
         bool isEnemyLayer = _layers[_activeLayerIndex].Name == EnemiesLayerName;
 
+        // If clicking on a hovered enemy while another layer is active, auto-switch to enemy layer
+        if (!imGuiWantsMouse && !isEnemyLayer && _hoveredEnemyIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
+        {
+            // Find and activate the enemies layer
+            for (int li = 0; li < _layers.Count; li++)
+            {
+                if (_layers[li].Name == EnemiesLayerName)
+                {
+                    _activeLayerIndex = li;
+                    break;
+                }
+            }
+            isEnemyLayer = true;
+            _selectedEnemyIndex = _hoveredEnemyIndex;
+            _isDraggingEnemy = true;
+        }
+
         if (!imGuiWantsMouse && isEnemyLayer)
         {
             if (IsMouseButtonPressed(MouseButton.Left))
@@ -225,6 +248,21 @@ public class LevelEditorScene : IScene
             _selectedEnemyIndex = -1;
         }
 
+        // Ctrl+/- for GUI scaling, plain +/- for zoom
+        bool ctrlHeld = IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl);
+
+        if (ctrlHeld)
+        {
+            if (IsKeyPressed(KeyboardKey.Equal) || IsKeyPressed(KeyboardKey.KpAdd))
+            {
+                _guiScale = Math.Clamp(_guiScale + GuiScaleStep, MinGuiScale, MaxGuiScale);
+            }
+            else if (IsKeyPressed(KeyboardKey.Minus) || IsKeyPressed(KeyboardKey.KpSubtract))
+            {
+                _guiScale = Math.Clamp(_guiScale - GuiScaleStep, MinGuiScale, MaxGuiScale);
+            }
+        }
+
         // Zoom with scroll wheel (toward cursor) or +/- keys (toward center)
         float zoomDelta = 0f;
         Vector2 zoomAnchor = new Vector2(GetScreenWidth() / 2f, GetScreenHeight() / 2f);
@@ -239,11 +277,11 @@ public class LevelEditorScene : IScene
             }
         }
 
-        if (IsKeyDown(KeyboardKey.Equal) || IsKeyDown(KeyboardKey.KpAdd))
+        if (!ctrlHeld && (IsKeyDown(KeyboardKey.Equal) || IsKeyDown(KeyboardKey.KpAdd)))
         {
             zoomDelta = 1f * deltaTime * 5f;
         }
-        else if (IsKeyDown(KeyboardKey.Minus) || IsKeyDown(KeyboardKey.KpSubtract))
+        else if (!ctrlHeld && (IsKeyDown(KeyboardKey.Minus) || IsKeyDown(KeyboardKey.KpSubtract)))
         {
             zoomDelta = -1f * deltaTime * 5f;
         }
@@ -331,11 +369,11 @@ public class LevelEditorScene : IScene
     private void RenderMenuBar()
     {
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 10));
-        ImGui.SetWindowFontScale(1.5f);
+        ImGui.SetWindowFontScale(_guiScale);
 
         if (ImGui.BeginMainMenuBar())
         {
-            ImGui.SetWindowFontScale(1.5f);
+            ImGui.SetWindowFontScale(_guiScale);
 
             if (ImGui.BeginMenu("File"))
             {
@@ -362,6 +400,29 @@ public class LevelEditorScene : IScene
                 {
                     _showLoadTmxDialog = true;
                 }
+
+                ImGui.EndMenu();
+            }
+
+            if (ImGui.BeginMenu("GUI"))
+            {
+                if (ImGui.MenuItem("Increase Scaling", "Ctrl++"))
+                {
+                    _guiScale = Math.Clamp(_guiScale + GuiScaleStep, MinGuiScale, MaxGuiScale);
+                }
+
+                if (ImGui.MenuItem("Decrease Scaling", "Ctrl+-"))
+                {
+                    _guiScale = Math.Clamp(_guiScale - GuiScaleStep, MinGuiScale, MaxGuiScale);
+                }
+
+                if (ImGui.MenuItem("Reset Scaling"))
+                {
+                    _guiScale = 1.5f;
+                }
+
+                ImGui.Separator();
+                ImGui.Text($"Scale: {_guiScale:F2}x");
 
                 ImGui.EndMenu();
             }
@@ -395,7 +456,7 @@ public class LevelEditorScene : IScene
         ImGui.SetNextWindowSize(new Vector2(500, 0));
         if (ImGui.BeginPopupModal("Save Level JSON", ImGuiWindowFlags.AlwaysAutoResize))
         {
-            ImGui.SetWindowFontScale(1.5f);
+            ImGui.SetWindowFontScale(_guiScale);
             ImGui.Text("Save level data to JSON file:");
             ImGui.InputText("Path", ref _savePath, 512);
 
@@ -426,7 +487,7 @@ public class LevelEditorScene : IScene
         ImGui.SetNextWindowSize(new Vector2(500, 0));
         if (ImGui.BeginPopupModal("Load Level JSON", ImGuiWindowFlags.AlwaysAutoResize))
         {
-            ImGui.SetWindowFontScale(1.5f);
+            ImGui.SetWindowFontScale(_guiScale);
             ImGui.Text("Load level data from JSON file:");
             ImGui.InputText("Path", ref _loadJsonPath, 512);
 
@@ -458,7 +519,7 @@ public class LevelEditorScene : IScene
         ImGui.SetNextWindowSize(new Vector2(500, 0));
         if (ImGui.BeginPopupModal("Load Level TMX", ImGuiWindowFlags.AlwaysAutoResize))
         {
-            ImGui.SetWindowFontScale(1.5f);
+            ImGui.SetWindowFontScale(_guiScale);
             ImGui.Text("Load level data from TMX file:");
             ImGui.InputText("Path", ref _loadTmxPath, 512);
 
@@ -621,7 +682,7 @@ public class LevelEditorScene : IScene
     {
         ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 45), ImGuiCond.FirstUseEver);
         ImGui.Begin("Layers", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(1.5f);
+        ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text("Render Order (top = drawn first)");
         ImGui.Text("Click layer name to select for painting");
@@ -702,7 +763,7 @@ public class LevelEditorScene : IScene
     {
         ImGui.SetNextWindowPos(new Vector2(10, 45), ImGuiCond.FirstUseEver);
         ImGui.Begin("Tile Palette", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(1.5f);
+        ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text($"Active Layer: {_layers[_activeLayerIndex].Name}");
         ImGui.Separator();
@@ -811,7 +872,7 @@ public class LevelEditorScene : IScene
         }
 
         ImGui.Begin("Cursor Info", flags);
-        ImGui.SetWindowFontScale(1.5f);
+        ImGui.SetWindowFontScale(_guiScale);
 
         if (tileInBounds)
         {
@@ -931,7 +992,7 @@ public class LevelEditorScene : IScene
 
         ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 500), ImGuiCond.FirstUseEver);
         ImGui.Begin("Enemy Properties", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(1.5f);
+        ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text($"Enemy #{_selectedEnemyIndex}");
         ImGui.Separator();
