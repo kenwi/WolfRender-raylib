@@ -32,7 +32,7 @@ public class LevelEditorScene : IScene
     private Vector2 _lastMousePos;
 
     // Cursor info panel
-    private bool _cursorInfoFollowsMouse = true;
+    private bool _cursorInfoFollowsMouse = false;
 
     // Tile painting
     private int _activeLayerIndex = 0;
@@ -119,6 +119,28 @@ public class LevelEditorScene : IScene
         if (IsKeyPressed(KeyboardKey.C))
         {
             _cursorInfoFollowsMouse = !_cursorInfoFollowsMouse;
+        }
+
+        // Layer hotkeys: 1-9 to activate, Ctrl+1-9 to toggle visibility
+        bool ctrlForLayers = IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl);
+        KeyboardKey[] numKeys = {
+            KeyboardKey.One, KeyboardKey.Two, KeyboardKey.Three,
+            KeyboardKey.Four, KeyboardKey.Five, KeyboardKey.Six,
+            KeyboardKey.Seven, KeyboardKey.Eight, KeyboardKey.Nine
+        };
+        for (int i = 0; i < numKeys.Length && i < _layers.Count; i++)
+        {
+            if (IsKeyPressed(numKeys[i]))
+            {
+                if (ctrlForLayers)
+                {
+                    _layers[i].IsVisible = !_layers[i].IsVisible;
+                }
+                else
+                {
+                    _activeLayerIndex = i;
+                }
+            }
         }
 
         // Status message timer
@@ -753,6 +775,8 @@ public class LevelEditorScene : IScene
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "RMB drag: Pan");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB: Paint tile / Place enemy");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Scroll / +/-: Zoom");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "1-9: Activate layer");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+1-9: Toggle visibility");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "C: Toggle cursor follow");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Del: Delete selected enemy");
 
