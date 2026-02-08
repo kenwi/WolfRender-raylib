@@ -79,8 +79,9 @@ public class World : IScene
         HideCursor();
         _inputSystem.CenterMouse();
 
-        // Rebuild doors from current MapData (may have changed in the editor)
+        // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
+        _enemySystem.Rebuild(_mapData.Enemies);
     }
 
     public void OnExit()

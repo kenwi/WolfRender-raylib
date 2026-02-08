@@ -38,6 +38,12 @@ public class LevelEditorScene : IScene
     private int _activeLayerIndex = 0;
     private uint _selectedTileId = 1; // 0 = eraser, 1+ = tile IDs
 
+    // Enemy editing
+    private const string EnemiesLayerName = "Enemies";
+    private int _hoveredEnemyIndex = -1;
+    private int _selectedEnemyIndex = -1;
+    private bool _isDraggingEnemy;
+
     // Pre-rendered rotated door texture for palette display
     private RenderTexture2D _rotatedDoorTexture;
 
@@ -70,6 +76,7 @@ public class LevelEditorScene : IScene
             new() { Name = "Walls", Tiles = mapData.Walls },
             new() { Name = "Ceiling", Tiles = mapData.Ceiling },
             new() { Name = "Doors", Tiles = mapData.Doors },
+            new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
         };
 
         // Pre-render the door texture rotated 90 degrees for the tile palette (vertical door, ID 8)
@@ -144,9 +151,61 @@ public class LevelEditorScene : IScene
             if (IsKeyDown(KeyboardKey.D)) _cameraOffset.X -= panSpeed;
         }
 
-        // Paint tiles with left mouse button (click or drag)
-        if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Left))
+        // Paint tiles / place enemies with left mouse button
+        bool isEnemyLayer = _layers[_activeLayerIndex].Name == EnemiesLayerName;
+
+        if (!imGuiWantsMouse && isEnemyLayer)
         {
+            if (IsMouseButtonPressed(MouseButton.Left))
+            {
+                // Enemy layer: click to select existing or place new enemy
+                if (_hoveredEnemyIndex >= 0)
+                {
+                    _selectedEnemyIndex = _hoveredEnemyIndex;
+                    _isDraggingEnemy = true;
+                }
+                else
+                {
+                    var paintPos = ScreenToWorld(GetMousePosition());
+                    int px = (int)MathF.Floor(paintPos.X);
+                    int py = (int)MathF.Floor(paintPos.Y);
+                    if (px >= 0 && px < _mapData.Width && py >= 0 && py < _mapData.Height)
+                    {
+                        _mapData.Enemies.Add(new EnemyPlacement
+                        {
+                            TileX = px,
+                            TileY = py,
+                            Rotation = 0,
+                            EnemyType = "Guard"
+                        });
+                        _selectedEnemyIndex = _mapData.Enemies.Count - 1;
+                        _isDraggingEnemy = true;
+                    }
+                }
+            }
+
+            // Drag selected enemy to new tile while holding LMB
+            if (_isDraggingEnemy && IsMouseButtonDown(MouseButton.Left)
+                && _selectedEnemyIndex >= 0 && _selectedEnemyIndex < _mapData.Enemies.Count)
+            {
+                var dragPos = ScreenToWorld(GetMousePosition());
+                int dx = (int)MathF.Floor(dragPos.X);
+                int dy = (int)MathF.Floor(dragPos.Y);
+                if (dx >= 0 && dx < _mapData.Width && dy >= 0 && dy < _mapData.Height)
+                {
+                    _mapData.Enemies[_selectedEnemyIndex].TileX = dx;
+                    _mapData.Enemies[_selectedEnemyIndex].TileY = dy;
+                }
+            }
+
+            if (IsMouseButtonReleased(MouseButton.Left))
+            {
+                _isDraggingEnemy = false;
+            }
+        }
+        else if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer)
+        {
+            // Tile layer: paint tiles (click or drag)
             var paintPos = ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
             int py = (int)MathF.Floor(paintPos.Y);
@@ -156,6 +215,14 @@ public class LevelEditorScene : IScene
                 int index = _mapData.Width * py + px;
                 activeLayer.Tiles[index] = _selectedTileId;
             }
+        }
+
+        // Delete selected enemy with Delete key
+        if (isEnemyLayer && _selectedEnemyIndex >= 0 && _selectedEnemyIndex < _mapData.Enemies.Count
+            && IsKeyPressed(KeyboardKey.Delete))
+        {
+            _mapData.Enemies.RemoveAt(_selectedEnemyIndex);
+            _selectedEnemyIndex = -1;
         }
 
         // Zoom with scroll wheel (toward cursor) or +/- keys (toward center)
@@ -207,7 +274,14 @@ public class LevelEditorScene : IScene
             var layer = _layers[i];
             if (!layer.IsVisible) continue;
 
-            RenderLayer(layer, tileSize);
+            if (layer.Name == EnemiesLayerName)
+            {
+                RenderEnemyLayer(tileSize);
+            }
+            else
+            {
+                RenderLayer(layer, tileSize);
+            }
         }
 
         // Highlight hovered tile
@@ -233,6 +307,7 @@ public class LevelEditorScene : IScene
         RenderLayerPanel();
         RenderTilePalette();
         RenderInfoPanel(tileX, tileY, worldPos, tileInBounds);
+        RenderEnemyPropertiesPanel();
         rlImGui.End();
 
         DrawText("Level Editor - F1 to return to game", 10, GetScreenHeight() - 70, 20, Color.White);
@@ -422,6 +497,9 @@ public class LevelEditorScene : IScene
         _mapData.Walls = new uint[tileCount];
         _mapData.Ceiling = new uint[tileCount];
         _mapData.Doors = new uint[tileCount];
+        _mapData.Enemies.Clear();
+        _selectedEnemyIndex = -1;
+        _hoveredEnemyIndex = -1;
         RefreshLayerReferences();
         _statusMessage = "New empty level created";
         _statusTimer = 4f;
@@ -433,6 +511,9 @@ public class LevelEditorScene : IScene
     /// </summary>
     private void RefreshLayerReferences()
     {
+        _selectedEnemyIndex = -1;
+        _hoveredEnemyIndex = -1;
+
         foreach (var layer in _layers)
         {
             layer.Tiles = layer.Name switch
@@ -608,10 +689,11 @@ public class LevelEditorScene : IScene
         }
 
         ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB drag: Pan");
-        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "RMB: Paint tile");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "RMB drag: Pan");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB: Paint tile / Place enemy");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Scroll / +/-: Zoom");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "C: Toggle cursor follow");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Del: Delete selected enemy");
 
         ImGui.End();
     }
@@ -749,18 +831,160 @@ public class LevelEditorScene : IScene
             ImGui.Separator();
             foreach (var layer in _layers)
             {
-                uint tileId = _mapData.GetTile(layer.Tiles, tileX, tileY);
-                string status = tileId > 0 ? $"ID {tileId}" : "empty";
-                var color = tileId > 0
-                    ? new Vector4(0.3f, 1f, 0.3f, 1f)
-                    : new Vector4(0.5f, 0.5f, 0.5f, 1f);
-                ImGui.TextColored(color, $"  {layer.Name}: {status}");
+                if (layer.Name == EnemiesLayerName)
+                {
+                    // Show enemy info for this tile
+                    var enemyHere = _mapData.Enemies.FindIndex(e => e.TileX == tileX && e.TileY == tileY);
+                    string status = enemyHere >= 0
+                        ? $"{_mapData.Enemies[enemyHere].EnemyType} (#{enemyHere})"
+                        : "empty";
+                    var color = enemyHere >= 0
+                        ? new Vector4(1f, 0.3f, 0.3f, 1f)
+                        : new Vector4(0.5f, 0.5f, 0.5f, 1f);
+                    ImGui.TextColored(color, $"  {layer.Name}: {status}");
+                }
+                else
+                {
+                    uint tileId = _mapData.GetTile(layer.Tiles, tileX, tileY);
+                    string status = tileId > 0 ? $"ID {tileId}" : "empty";
+                    var color = tileId > 0
+                        ? new Vector4(0.3f, 1f, 0.3f, 1f)
+                        : new Vector4(0.5f, 0.5f, 0.5f, 1f);
+                    ImGui.TextColored(color, $"  {layer.Name}: {status}");
+                }
             }
         }
         else
         {
             ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Outside map bounds");
         }
+
+        ImGui.End();
+    }
+
+    /// <summary>
+    /// Render enemies as red circles on the map. Handles hover highlight and selection.
+    /// </summary>
+    private void RenderEnemyLayer(float tileSize)
+    {
+        var mouseScreen = GetMousePosition();
+        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
+        _hoveredEnemyIndex = -1;
+
+        float radius = tileSize * 0.35f;
+
+        for (int i = 0; i < _mapData.Enemies.Count; i++)
+        {
+            var enemy = _mapData.Enemies[i];
+
+            // Center of the tile in screen space
+            float centerX = (enemy.TileX + 0.5f) * tileSize + _cameraOffset.X;
+            float centerY = (enemy.TileY + 0.5f) * tileSize + _cameraOffset.Y;
+
+            // Check if mouse is hovering this enemy circle
+            if (!imGuiWantsMouse)
+            {
+                float dx = mouseScreen.X - centerX;
+                float dy = mouseScreen.Y - centerY;
+                if (dx * dx + dy * dy <= radius * radius)
+                {
+                    _hoveredEnemyIndex = i;
+                }
+            }
+
+            // Draw filled red circle
+            DrawCircle((int)centerX, (int)centerY, radius, new Color(200, 40, 40, 200));
+
+            // Draw yellow outline if hovered
+            if (i == _hoveredEnemyIndex)
+            {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 2f, Color.Yellow);
+                DrawCircleLines((int)centerX, (int)centerY, radius + 3f, Color.Yellow);
+            }
+
+            // Draw white outline if selected
+            if (i == _selectedEnemyIndex)
+            {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 1f, Color.White);
+                DrawCircleLines((int)centerX, (int)centerY, radius + 4f, Color.White);
+            }
+
+            // Draw a small direction indicator line from center
+            float dirLen = radius * 0.8f;
+            float angle = enemy.Rotation;
+            float endX = centerX + MathF.Cos(angle) * dirLen;
+            float endY = centerY - MathF.Sin(angle) * dirLen;
+            DrawLineEx(new Vector2(centerX, centerY), new Vector2(endX, endY), 2f, Color.White);
+        }
+    }
+
+    /// <summary>
+    /// Render ImGui panel showing properties of the selected enemy.
+    /// </summary>
+    private void RenderEnemyPropertiesPanel()
+    {
+        if (_selectedEnemyIndex < 0 || _selectedEnemyIndex >= _mapData.Enemies.Count)
+            return;
+
+        var enemy = _mapData.Enemies[_selectedEnemyIndex];
+
+        ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 500), ImGuiCond.FirstUseEver);
+        ImGui.Begin("Enemy Properties", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.SetWindowFontScale(1.5f);
+
+        ImGui.Text($"Enemy #{_selectedEnemyIndex}");
+        ImGui.Separator();
+
+        // Tile position
+        int tileX = enemy.TileX;
+        int tileY = enemy.TileY;
+        if (ImGui.InputInt("Tile X", ref tileX))
+        {
+            enemy.TileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
+        }
+        if (ImGui.InputInt("Tile Y", ref tileY))
+        {
+            enemy.TileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
+        }
+
+        ImGui.Spacing();
+
+        // World position (read-only, calculated from tile)
+        float worldX = enemy.TileX * Utilities.LevelData.QuadSize;
+        float worldZ = enemy.TileY * Utilities.LevelData.QuadSize;
+        ImGui.Text("World Position");
+        ImGui.Text($"  X: {worldX:F1}  Y: 2.0  Z: {worldZ:F1}");
+
+        ImGui.Spacing();
+
+        // Rotation (snapped to 45-degree increments)
+        const float step = MathF.PI / 4f; // 45 degrees
+        int rotIndex = (int)MathF.Round(enemy.Rotation / step);
+        rotIndex = Math.Clamp(rotIndex, 0, 7);
+        string[] labels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
+        if (ImGui.SliderInt("Rotation", ref rotIndex, 0, 7, labels[rotIndex]))
+        {
+            enemy.Rotation = rotIndex * step;
+        }
+
+        ImGui.Spacing();
+
+        // Enemy type
+        ImGui.Text($"Type: {enemy.EnemyType}");
+        if (ImGui.Button("Guard")) enemy.EnemyType = "Guard";
+
+        ImGui.Spacing();
+        ImGui.Separator();
+
+        // Delete button
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.2f, 0.2f, 1f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.3f, 0.3f, 1f));
+        if (ImGui.Button("Delete Enemy", new Vector2(-1, 0)))
+        {
+            _mapData.Enemies.RemoveAt(_selectedEnemyIndex);
+            _selectedEnemyIndex = -1;
+        }
+        ImGui.PopStyleColor(2);
 
         ImGui.End();
     }

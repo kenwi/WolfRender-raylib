@@ -11,27 +11,33 @@ public class EnemySystem
     private readonly InputSystem _inputSystem;
     public List<Enemy> Enemies => _enemies;
     
-    public EnemySystem(Player player, InputSystem inputSystem /* remove this */)
+    public EnemySystem(Player player, InputSystem inputSystem)
     {
         _inputSystem = inputSystem;
         _player = player;
-        
-        // Static implementation to be enhanced
-        // _enemies = new List<Enemy>()
-        // {
-        //     new EnemyGuard()
-        //     {
-        //         Position = new Vector3(27 * 4, 2, 27 * 4),
-        //         Rotation = 0
-        //     },
-            
-        //     new EnemyGuard()
-        //     {
-        //         Position = new Vector3(30 * 4, 2, 26 * 4),
-        //         Rotation = 0
-        //     }
-        // };
         _enemies = new List<Enemy>();
+    }
+
+    /// <summary>
+    /// Rebuild the enemy list from MapData enemy placements.
+    /// Call this when the level data has changed (e.g. after editing in the level editor).
+    /// </summary>
+    public void Rebuild(List<EnemyPlacement> placements)
+    {
+        _enemies.Clear();
+        
+        foreach (var placement in placements)
+        {
+            var enemy = new EnemyGuard
+            {
+                Position = new Vector3(
+                    placement.TileX * LevelData.QuadSize,
+                    2f,
+                    placement.TileY * LevelData.QuadSize),
+                Rotation = placement.Rotation
+            };
+            _enemies.Add(enemy);
+        }
     }
 
     public void Update(float deltaTime)

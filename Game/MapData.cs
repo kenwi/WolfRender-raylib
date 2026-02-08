@@ -3,6 +3,17 @@ using Raylib_cs;
 namespace Game;
 
 /// <summary>
+/// Describes a placed enemy in tile coordinates, used for editor and serialization.
+/// </summary>
+public class EnemyPlacement
+{
+    public int TileX { get; set; }
+    public int TileY { get; set; }
+    public float Rotation { get; set; }
+    public string EnemyType { get; set; } = "Guard";
+}
+
+/// <summary>
 /// Shared level data stored as raw tile ID arrays.
 /// Both the game and editor scenes reference this, and serialization operates on these arrays directly.
 /// </summary>
@@ -12,6 +23,7 @@ public class MapData
     public uint[] Walls { get; set; } = Array.Empty<uint>();
     public uint[] Ceiling { get; set; } = Array.Empty<uint>();
     public uint[] Doors { get; set; } = Array.Empty<uint>();
+    public List<EnemyPlacement> Enemies { get; set; } = new();
     public List<Texture2D> Textures { get; set; } = new();
     public int Width { get; set; }
     public int Height { get; set; }

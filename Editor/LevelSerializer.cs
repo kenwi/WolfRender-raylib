@@ -2,6 +2,14 @@ using System.Text.Json;
 
 namespace Game.Editor;
 
+public class EnemyPlacementData
+{
+    public int TileX { get; set; }
+    public int TileY { get; set; }
+    public float Rotation { get; set; }
+    public string EnemyType { get; set; } = "Guard";
+}
+
 public class LevelFileData
 {
     public int Width { get; set; }
@@ -10,6 +18,7 @@ public class LevelFileData
     public uint[] Walls { get; set; } = Array.Empty<uint>();
     public uint[] Ceiling { get; set; } = Array.Empty<uint>();
     public uint[] Doors { get; set; } = Array.Empty<uint>();
+    public List<EnemyPlacementData> Enemies { get; set; } = new();
 }
 
 public static class LevelSerializer
@@ -28,7 +37,14 @@ public static class LevelSerializer
             Floor = mapData.Floor,
             Walls = mapData.Walls,
             Ceiling = mapData.Ceiling,
-            Doors = mapData.Doors
+            Doors = mapData.Doors,
+            Enemies = mapData.Enemies.Select(e => new EnemyPlacementData
+            {
+                TileX = e.TileX,
+                TileY = e.TileY,
+                Rotation = e.Rotation,
+                EnemyType = e.EnemyType
+            }).ToList()
         };
 
         var json = JsonSerializer.Serialize(fileData, JsonOptions);
@@ -47,6 +63,13 @@ public static class LevelSerializer
         mapData.Walls = fileData.Walls;
         mapData.Ceiling = fileData.Ceiling;
         mapData.Doors = fileData.Doors;
+        mapData.Enemies = fileData.Enemies.Select(e => new EnemyPlacement
+        {
+            TileX = e.TileX,
+            TileY = e.TileY,
+            Rotation = e.Rotation,
+            EnemyType = e.EnemyType
+        }).ToList();
     }
 
     public static void LoadFromTmx(MapData mapData, string path)

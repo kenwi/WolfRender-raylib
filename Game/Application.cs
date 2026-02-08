@@ -77,11 +77,19 @@ public class Application
             LoadTexture("resources/redbrick.png"),
             LoadTexture("resources/wood.png"),
             LoadTexture("resources/door.png"),
-            LoadTexture("resources/enemy_guard2.png")
+            LoadTexture("resources/enemy_guard.png")
         };
 
         var mapData = new MapData { Textures = textures };
         Editor.LevelSerializer.LoadFromTmx(mapData, "resources/map1.tmx");
+
+        // Seed initial enemy placements (previously hardcoded in EnemySystem)
+        mapData.Enemies = new List<EnemyPlacement>
+        {
+            new() { TileX = 27, TileY = 27, Rotation = 0, EnemyType = "Guard" },
+            new() { TileX = 30, TileY = 26, Rotation = 0, EnemyType = "Guard" },
+        };
+
         return mapData;
     }
 
