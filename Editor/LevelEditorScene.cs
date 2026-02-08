@@ -910,10 +910,11 @@ public class LevelEditorScene : IScene
             }
 
             // Draw a small direction indicator line from center
+            // Screen Y increases downward, matching the game world's Z axis
             float dirLen = radius * 0.8f;
             float angle = enemy.Rotation;
             float endX = centerX + MathF.Cos(angle) * dirLen;
-            float endY = centerY - MathF.Sin(angle) * dirLen;
+            float endY = centerY + MathF.Sin(angle) * dirLen;
             DrawLineEx(new Vector2(centerX, centerY), new Vector2(endX, endY), 2f, Color.White);
         }
     }
