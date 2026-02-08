@@ -38,6 +38,9 @@ public class LevelEditorScene : IScene
     private int _activeLayerIndex = 0;
     private uint _selectedTileId = 1; // 0 = eraser, 1+ = tile IDs
 
+    // Pre-rendered rotated door texture for palette display
+    private RenderTexture2D _rotatedDoorTexture;
+
     // File dialog state
     private bool _showSaveDialog;
     private bool _showLoadJsonDialog;
@@ -68,6 +71,24 @@ public class LevelEditorScene : IScene
             new() { Name = "Ceiling", Tiles = mapData.Ceiling },
             new() { Name = "Doors", Tiles = mapData.Doors },
         };
+
+        // Pre-render the door texture rotated 90 degrees for the tile palette (vertical door, ID 8)
+        if (mapData.Textures.Count > 6)
+        {
+            var doorTex = mapData.Textures[6]; // door.png
+            _rotatedDoorTexture = LoadRenderTexture(doorTex.Width, doorTex.Height);
+            BeginTextureMode(_rotatedDoorTexture);
+            ClearBackground(Color.Blank);
+            DrawTexturePro(
+                doorTex,
+                new Rectangle(0, 0, doorTex.Width, doorTex.Height),
+                new Rectangle(doorTex.Width / 2f, doorTex.Height / 2f, doorTex.Width, doorTex.Height),
+                new Vector2(doorTex.Width / 2f, doorTex.Height / 2f),
+                90f,
+                Color.White
+            );
+            EndTextureMode();
+        }
     }
 
     public void OnEnter()
@@ -645,7 +666,22 @@ public class LevelEditorScene : IScene
                 ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 3f);
             }
 
-            if (ImGui.ImageButton($"tile_{i}", new IntPtr(texture.Id), new Vector2(buttonSize, buttonSize)))
+            // For vertical door (tile ID 8), use the rotated door texture
+            IntPtr texId;
+            if (tileId == 8 && _rotatedDoorTexture.Texture.Id != 0)
+            {
+                texId = new IntPtr(_rotatedDoorTexture.Texture.Id);
+            }
+            else
+            {
+                texId = new IntPtr(texture.Id);
+            }
+
+            // RenderTexture is flipped vertically in OpenGL, so flip UVs for the rotated door
+            var uv0 = (tileId == 8) ? new Vector2(0, 1) : new Vector2(0, 0);
+            var uv1 = (tileId == 8) ? new Vector2(1, 0) : new Vector2(1, 1);
+
+            if (ImGui.ImageButton($"tile_{i}", texId, new Vector2(buttonSize, buttonSize), uv0, uv1))
             {
                 _selectedTileId = tileId;
             }
