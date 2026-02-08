@@ -6,10 +6,10 @@ using ImGuiNET;
 
 public static class Debug
 {
-    private static List<Door> _doors;
-    private static Player _player;
-    private static AnimationSystem _animationSystem;
-    private static EnemySystem _enemySystem;
+    private static List<Door> _doors = null!;
+    private static Player _player = null!;
+    private static AnimationSystem _animationSystem = null!;
+    private static EnemySystem _enemySystem = null!;
 
     public static void Setup(List<Door> doors, Player player, AnimationSystem animationSystem, EnemySystem enemySystem)
     {
