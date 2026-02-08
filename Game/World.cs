@@ -8,9 +8,10 @@ using static Raylib_cs.Raylib;
 
 namespace Game;
 
-public class World
+public class World : IScene
 {
     private readonly Player _player;
+    private readonly MapData _mapData;
     private readonly LevelData _level;
     private readonly List<Texture2D> _textures;
 
@@ -27,46 +28,17 @@ public class World
 
     // Rendering
     private readonly RenderTexture2D _sceneRenderTexture;
-    private InputState _inputState;
+    private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
 
-    public World()
+    public World(MapData mapData)
     {
-        // Initialize Raylib
-        // SetConfigFlags(ConfigFlags.VSyncHint);
-        SetTargetFPS(120);
-        InitWindow(0, 0, "");
-        SetWindowState(ConfigFlags.ResizableWindow);
-        
-        RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
         int screenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
         int screenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
 
-        // Load level
-        var loader = DotTiled.Serialization.Loader.Default();
-        var map = loader.LoadMap("resources/map1.tmx");
-        var floor = map.Layers[0] as DotTiled.TileLayer;
-        var walls = map.Layers[1] as DotTiled.TileLayer;
-        var ceiling = map.Layers[2] as DotTiled.TileLayer;
-        var doors = map.Layers[3] as DotTiled.TileLayer;
-
-        if (walls == null || floor == null || ceiling == null || doors == null)
-            throw new InvalidOperationException("Level must have walls, floor, and ceiling layers");
-        
-        _level = new LevelData(walls, floor, ceiling);
-
-        // Load textures
-        _textures = new List<Texture2D>
-        {
-            LoadTexture("resources/greystone.png"),
-            LoadTexture("resources/bluestone.png"),
-            LoadTexture("resources/colorstone.png"),
-            LoadTexture("resources/mossy.png"),
-            LoadTexture("resources/redbrick.png"),
-            LoadTexture("resources/wood.png"),
-            LoadTexture("resources/door.png"),
-            LoadTexture("resources/enemy_guard2.png")
-        };
+        _mapData = mapData;
+        _level = new LevelData(mapData);
+        _textures = mapData.Textures;
 
         // Initialize player
         _player = new Player
@@ -85,7 +57,7 @@ public class World
         // Initialize systems (note: collision system is created first as camera system depends on it)
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
-        _doorSystem = new DoorSystem(doors, _textures);
+        _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _textures);
         _collisionSystem = new CollisionSystem(_level, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _textures);
@@ -101,21 +73,42 @@ public class World
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
     }
 
+    public void OnEnter()
+    {
+        // Hide and center cursor for FPS-style controls
+        HideCursor();
+        _inputSystem.CenterMouse();
+
+        // Rebuild doors from current MapData (may have changed in the editor)
+        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
+    }
+
+    public void OnExit()
+    {
+        // Restore cursor when leaving the game scene
+        ShowCursor();
+    }
+
     public void Update(float deltaTime)
     {
+        _inputState = _inputSystem.GetInputState();
         var mouseDelta = _inputState.MouseDelta;
         
-        _inputSystem.LockMouse();
+        // Center mouse AFTER getting input state (which calculates delta from center)
+        _inputSystem.CenterMouse();
         _inputSystem.Update();
 
-        _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
+        if (_inputState.IsGamePaused)
+        {
+            _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
 
-        _movementSystem.Update(_player, deltaTime);
-        _collisionSystem.Update(_player, deltaTime);
-        _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
-        _doorSystem.Update(deltaTime, _inputState, _player.Position);
-        _animationSystem.Update(deltaTime);
-        _enemySystem.Update(deltaTime);
+            _movementSystem.Update(_player, deltaTime);
+            _collisionSystem.Update(_player, deltaTime);
+            _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
+            _doorSystem.Update(deltaTime, _inputState, _player.Position);
+            _animationSystem.Update(deltaTime);
+            _enemySystem.Update(deltaTime);
+        }
     }
 
     public void Render()
@@ -179,32 +172,5 @@ public class World
         EndDrawing();
     }
 
-    public void Run()
-    {
-        while (!WindowShouldClose())
-        {
-            var deltaTime = GetFrameTime();
-            _inputState =  _inputSystem.GetInputState();
-            
-            if (_inputState.IsGamePaused)
-            {
-                Update(deltaTime);
-            }
-            else
-            {
-                _inputSystem.Update();
-            }
-            Render();
-        }
-
-        Cleanup();
-    }
-
-    private void Cleanup()
-    {
-        _hudSystem.Dispose();
-        UnloadRenderTexture(_sceneRenderTexture);
-        CloseWindow();
-    }
 }
 

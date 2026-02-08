@@ -29,7 +29,7 @@ public class AnimationSystem
         var spriteSize = 64;
         var padding = 1;
 
-        foreach (var enemy in _enemySystem.Enemies)
+        foreach (var enemy in _enemySystem?.Enemies ?? new List<Enemy>())
         {
             var frameColumnIndex = enemy.FrameColumnIndex;
             var frameRowIndex = enemy.FrameRowIndex;

@@ -33,6 +33,14 @@ public class InputSystem
         if (IsKeyPressed(KeyboardKey.L))
         {
             _isMouseFree = !_isMouseFree;
+            if (_isMouseFree)
+            {
+                ShowCursor();
+            }
+            else
+            {
+                HideCursor();
+            }
         }
 
         if (IsKeyPressed(KeyboardKey.P))
@@ -51,12 +59,11 @@ public class InputSystem
         }
     }
 
-    public void LockMouse()
+    public void CenterMouse()
     {
         if (!_isMouseFree)
         {
-            var screenCenter = GetScreenCenter();
-            SetMousePosition((int)screenCenter.X, (int)screenCenter.Y);
+            SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
         }
     }
 

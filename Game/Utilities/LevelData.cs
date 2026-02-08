@@ -1,6 +1,4 @@
-using System.ComponentModel;
 using System.Numerics;
-using DotTiled;
 
 namespace Game.Utilities;
 
@@ -12,27 +10,23 @@ public static class RenderData
 
 public class LevelData
 {
-    private readonly TileLayer _walls;
-    private readonly TileLayer _floor;
-    private readonly TileLayer _ceiling;
+    private readonly MapData _mapData;
     private const int MapWidth = 64;
-    public int Width => (int)_walls.Width;
-    public int Height => (int)_walls.Height;
+    public int Width => _mapData.Width;
+    public int Height => _mapData.Height;
     public static int QuadSize => 4;
     public static int DrawedQuads = 0;
     public static int TileCount = MapWidth * MapWidth;
 
-    public LevelData(TileLayer walls, TileLayer floor, TileLayer ceiling)
+    public LevelData(MapData mapData)
     {
-        _walls = walls;
-        _floor = floor;
-        _ceiling = ceiling;
+        _mapData = mapData;
     }
 
-    public static int GetIndex(int col, int row, int width = LevelData.MapWidth) => width * row + col;
-    
-    public static (int col, int row) GetColRow(int index, int width = LevelData.MapWidth) => (index % width, index / width);
-    
+    public static int GetIndex(int col, int row, int width = MapWidth) => width * row + col;
+
+    public static (int col, int row) GetColRow(int index, int width = MapWidth) => (index % width, index / width);
+
     public bool IsWallAt(float worldX, float worldZ)
     {
         int tileX = (int)(worldX / 4 + 0.5f);
@@ -41,35 +35,13 @@ public class LevelData
         if (tileX < 0 || tileX >= Width || tileY < 0 || tileY >= Height)
             return true;
 
-        int index = GetIndex(tileX, tileY, MapWidth);
-        return _walls?.Data?.Value?.GlobalTileIDs?.Value?[index] != 0;
+        int index = GetIndex(tileX, tileY, Width);
+        return _mapData.Walls[index] != 0;
     }
 
-    public uint GetWallTile(int x, int y)
-    {
-        if (x < 0 || x >= Width || y < 0 || y >= Height)
-            return 0;
+    public uint GetWallTile(int x, int y) => _mapData.GetTile(_mapData.Walls, x, y);
 
-        int index = GetIndex(x, y, MapWidth);
-        return _walls?.Data?.Value?.GlobalTileIDs?.Value?[index] ?? 0;
-    }
+    public uint GetFloorTile(int x, int y) => _mapData.GetTile(_mapData.Floor, x, y);
 
-    public uint GetFloorTile(int x, int y)
-    {
-        if (x < 0 || x >= Width || y < 0 || y >= Height)
-            return 0;
-
-        int index = GetIndex(x, y, MapWidth);
-        return _floor?.Data?.Value?.GlobalTileIDs?.Value?[index] ?? 0;
-    }
-
-    public uint GetCeilingTile(int x, int y)
-    {
-        if (x < 0 || x >= Width || y < 0 || y >= Height)
-            return 0;
-
-        int index = GetIndex(x, y, MapWidth);
-        return _ceiling?.Data?.Value?.GlobalTileIDs?.Value?[index] ?? 0;
-    }
+    public uint GetCeilingTile(int x, int y) => _mapData.GetTile(_mapData.Ceiling, x, y);
 }
-

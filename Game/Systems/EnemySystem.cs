@@ -17,20 +17,21 @@ public class EnemySystem
         _player = player;
         
         // Static implementation to be enhanced
-        _enemies = new List<Enemy>()
-        {
-            new EnemyGuard()
-            {
-                Position = new Vector3(27 * 4, 2, 27 * 4),
-                Rotation = 0
-            },
+        // _enemies = new List<Enemy>()
+        // {
+        //     new EnemyGuard()
+        //     {
+        //         Position = new Vector3(27 * 4, 2, 27 * 4),
+        //         Rotation = 0
+        //     },
             
-            new EnemyGuard()
-            {
-                Position = new Vector3(30 * 4, 2, 26 * 4),
-                Rotation = 0
-            }
-        };
+        //     new EnemyGuard()
+        //     {
+        //         Position = new Vector3(30 * 4, 2, 26 * 4),
+        //         Rotation = 0
+        //     }
+        // };
+        _enemies = new List<Enemy>();
     }
 
     public void Update(float deltaTime)

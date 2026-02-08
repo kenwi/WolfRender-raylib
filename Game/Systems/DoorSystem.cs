@@ -1,7 +1,4 @@
-using System.Collections;
-using System.Data;
 using System.Numerics;
-using DotTiled;
 using Game.Entities;
 using Game.Utilities;
 using Raylib_cs;
@@ -10,7 +7,6 @@ namespace Game.Systems;
 
 public class DoorSystem
 {
-    private readonly TileLayer _layer;
     private readonly List<Texture2D> _textures;
     private readonly List<Door> _doors;
     private readonly int _quadSize;
@@ -18,20 +14,29 @@ public class DoorSystem
 
     public List<Door> Doors => _doors;
 
-    public DoorSystem(TileLayer layer, List<Texture2D> textures)
+    public DoorSystem(uint[] doorTiles, int mapWidth, List<Texture2D> textures)
     {
-        _layer = layer;
         _textures = textures;
         _doors = new List<Door>(20);
         _quadSize = LevelData.QuadSize;
 
-        var ids = _layer.Data.Value.GlobalTileIDs.Value;      
-        for (int index = 0; index < LevelData.TileCount; index++)
+        Rebuild(doorTiles, mapWidth);
+    }
+
+    /// <summary>
+    /// Rebuild the door list from the current tile data.
+    /// Call this when the level data has changed (e.g. after editing in the level editor).
+    /// </summary>
+    public void Rebuild(uint[] doorTiles, int mapWidth)
+    {
+        _doors.Clear();
+
+        for (int index = 0; index < doorTiles.Length; index++)
         {
-            var value = ids[index];
-            if (ids[index] > 0)
+            var value = doorTiles[index];
+            if (value > 0)
             {
-                var colRow = LevelData.GetColRow(index);
+                var colRow = LevelData.GetColRow(index, mapWidth);
                 var door = new Door()
                 {
                     Position = new Vector2(colRow.col, colRow.row),
