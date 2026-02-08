@@ -21,10 +21,10 @@ public class LevelEditorScene : IScene
 
     // 2D camera state
     private Vector2 _cameraOffset;
-    private float _zoom = 1.0f;
+    private float _zoom = 4.5f;
     private const float BaseTileSize = 16f;
     private const float MinZoom = 0.25f;
-    private const float MaxZoom = 8.0f;
+    private const float MaxZoom = 10.0f;
     private const float ZoomSpeed = 0.1f;
 
     // Panning state
@@ -55,9 +55,9 @@ public class LevelEditorScene : IScene
     {
         _mapData = mapData;
 
-        // Center the map on screen initially
-        float mapPixelWidth = mapData.Width * BaseTileSize;
-        float mapPixelHeight = mapData.Height * BaseTileSize;
+        // Center the map on screen initially (account for zoom)
+        float mapPixelWidth = mapData.Width * BaseTileSize * _zoom;
+        float mapPixelHeight = mapData.Height * BaseTileSize * _zoom;
         _cameraOffset = new Vector2(
             (GetScreenWidth() - mapPixelWidth) / 2f,
             (GetScreenHeight() - mapPixelHeight) / 2f
