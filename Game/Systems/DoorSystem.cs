@@ -133,8 +133,10 @@ public class DoorSystem
                 }
             }
 
-            if (closestDoor.TimeDoorHasBeenOpening > 0.5)
-                ;
+            // if (closestDoor.TimeDoorHasBeenOpening > 0.5)
+            // {
+            //     // TODO: handle door auto-close logic
+            // }
         }
         return false;
     }
