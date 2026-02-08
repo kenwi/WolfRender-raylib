@@ -96,8 +96,8 @@ public class LevelEditorScene : IScene
         // Don't handle map input when ImGui wants the mouse
         bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
 
-        // Pan with left mouse button drag
-        if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Left))
+        // Pan with right mouse button drag
+        if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Right))
         {
             var mousePos = GetMousePosition();
             if (_isDragging)
@@ -123,8 +123,8 @@ public class LevelEditorScene : IScene
             if (IsKeyDown(KeyboardKey.D)) _cameraOffset.X -= panSpeed;
         }
 
-        // Paint tiles with right mouse button (click or drag)
-        if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Right))
+        // Paint tiles with left mouse button (click or drag)
+        if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Left))
         {
             var paintPos = ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
