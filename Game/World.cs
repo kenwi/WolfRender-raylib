@@ -31,6 +31,7 @@ public class World : IScene
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
 
+    public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
     public DoorSystem DoorSystem => _doorSystem;
 
@@ -79,12 +80,12 @@ public class World : IScene
     public void OnEnter()
     {
         // Hide and center cursor for FPS-style controls
-        // HideCursor();
+        HideCursor();
         // _inputSystem.CenterMouse();
 
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-        _enemySystem.Rebuild(_mapData.Enemies);
+        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
     }
 
     public void OnExit()

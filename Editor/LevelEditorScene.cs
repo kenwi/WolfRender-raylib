@@ -62,6 +62,7 @@ public class LevelEditorScene : IScene
     // Simulation
     private readonly EnemySystem _enemySystem;
     private readonly DoorSystem _doorSystem;
+    private readonly Entities.Player _player;
     private bool _isSimulating;
 
     // File dialog state
@@ -74,11 +75,12 @@ public class LevelEditorScene : IScene
     private string _statusMessage = "";
     private float _statusTimer;
 
-    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem)
+    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Entities.Player player)
     {
         _mapData = mapData;
         _enemySystem = enemySystem;
         _doorSystem = doorSystem;
+        _player = player;
 
         // Center the map on screen initially (account for zoom)
         float mapPixelWidth = mapData.Width * BaseTileSize * _zoom;
@@ -170,7 +172,7 @@ public class LevelEditorScene : IScene
             if (_isSimulating)
             {
                 // Rebuild enemies and doors from current editor data before simulating
-                _enemySystem.Rebuild(_mapData.Enemies);
+                _enemySystem.Rebuild(_mapData.Enemies, _mapData);
                 _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
             }
         }
@@ -426,6 +428,9 @@ public class LevelEditorScene : IScene
             }
         }
 
+        // Draw player position indicator
+        RenderPlayerIndicator(tileSize);
+
         // Highlight hovered tile
         var mouseScreen = GetMousePosition();
         var worldPos = ScreenToWorld(mouseScreen);
@@ -545,7 +550,7 @@ public class LevelEditorScene : IScene
                     _isSimulating = !_isSimulating;
                     if (_isSimulating)
                     {
-                        _enemySystem.Rebuild(_mapData.Enemies);
+                        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
                         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
                     }
                 }
@@ -1095,6 +1100,41 @@ public class LevelEditorScene : IScene
     /// <summary>
     /// Render enemies as red circles on the map. Handles hover highlight and selection.
     /// </summary>
+    /// <summary>
+    /// Draw a blue diamond marker at the player's current world-space position on the 2D map.
+    /// </summary>
+    private void RenderPlayerIndicator(float tileSize)
+    {
+        float quadSize = Utilities.LevelData.QuadSize;
+        float tilePosX = _player.Position.X / quadSize;
+        float tilePosZ = _player.Position.Z / quadSize;
+
+        float screenX = (tilePosX + 0.5f) * tileSize + _cameraOffset.X;
+        float screenY = (tilePosZ + 0.5f) * tileSize + _cameraOffset.Y;
+
+        float radius = tileSize * 0.35f;
+
+        // Blue filled circle
+        DrawCircle((int)screenX, (int)screenY, radius, new Color(30, 120, 255, 200));
+        DrawCircleLines((int)screenX, (int)screenY, radius, new Color(80, 170, 255, 255));
+        DrawCircleLines((int)screenX, (int)screenY, radius + 1f, new Color(80, 170, 255, 255));
+
+        // Direction indicator based on camera yaw
+        // The player's Camera.Target - Camera.Position gives the look direction
+        var cam = _player.Camera;
+        var lookDir = Vector3.Normalize(cam.Target - cam.Position);
+        float angle = MathF.Atan2(lookDir.Z, lookDir.X);
+        float dirLen = radius * 0.9f;
+        float endX = screenX + MathF.Cos(angle) * dirLen;
+        float endY = screenY + MathF.Sin(angle) * dirLen;
+        DrawLineEx(new Vector2(screenX, screenY), new Vector2(endX, endY), 2f, Color.White);
+
+        // Label
+        const string label = "Player";
+        int labelW = MeasureText(label, 14);
+        DrawText(label, (int)(screenX - labelW / 2f), (int)(screenY - radius - 16), 14, new Color(80, 170, 255, 255));
+    }
+
     private void RenderEnemyLayer(float tileSize)
     {
         var mouseScreen = GetMousePosition();
@@ -1166,7 +1206,7 @@ public class LevelEditorScene : IScene
             }
         }
 
-        // When simulating, draw live enemy positions as green circles
+        // When simulating, draw live enemy positions as green circles with FOV polygons
         if (_isSimulating && _enemySystem.Enemies != null)
         {
             float liveRadius = tileSize * 0.3f;
@@ -1181,23 +1221,103 @@ public class LevelEditorScene : IScene
                 float liveCX = (tilePosX + 0.5f) * tileSize + _cameraOffset.X;
                 float liveCY = (tilePosZ + 0.5f) * tileSize + _cameraOffset.Y;
 
+                // Draw FOV polygon
+                if (liveEnemy.FovPolygon.Count >= 3)
+                {
+                    // FOV polygon points are already in tile-center space (origin offset by +0.5 in EnemySystem)
+                    // so we convert directly to screen coords without an extra +0.5
+                    var origin = liveEnemy.FovPolygon[0];
+                    float originScreenX = origin.X * tileSize + _cameraOffset.X;
+                    float originScreenY = origin.Y * tileSize + _cameraOffset.Y;
+
+                    // Choose color based on whether the enemy can see the player
+                    var fovFillColor = liveEnemy.CanSeePlayer
+                        ? new Color(255, 40, 40, 80)   // Red when player spotted
+                        : new Color(255, 200, 0, 60);  // Yellow when scanning
+
+                    var fovEdgeColor = liveEnemy.CanSeePlayer
+                        ? new Color(255, 80, 80, 180)
+                        : new Color(255, 200, 0, 140);
+
+                    for (int r = 1; r < liveEnemy.FovPolygon.Count - 1; r++)
+                    {
+                        var p1 = liveEnemy.FovPolygon[r];
+                        var p2 = liveEnemy.FovPolygon[r + 1];
+
+                        float p1x = p1.X * tileSize + _cameraOffset.X;
+                        float p1y = p1.Y * tileSize + _cameraOffset.Y;
+                        float p2x = p2.X * tileSize + _cameraOffset.X;
+                        float p2y = p2.Y * tileSize + _cameraOffset.Y;
+
+                        DrawTriangle(
+                            new Vector2(originScreenX, originScreenY),
+                            new Vector2(p1x, p1y),
+                            new Vector2(p2x, p2y),
+                            fovFillColor);
+
+                        // Also draw with reversed winding for back-face
+                        DrawTriangle(
+                            new Vector2(originScreenX, originScreenY),
+                            new Vector2(p2x, p2y),
+                            new Vector2(p1x, p1y),
+                            fovFillColor);
+                    }
+
+                    // Draw FOV edge lines
+                    for (int r = 1; r < liveEnemy.FovPolygon.Count; r++)
+                    {
+                        var p = liveEnemy.FovPolygon[r];
+                        float px = p.X * tileSize + _cameraOffset.X;
+                        float py = p.Y * tileSize + _cameraOffset.Y;
+
+                        if (r == 1 || r == liveEnemy.FovPolygon.Count - 1)
+                        {
+                            // Draw edge rays from origin
+                            DrawLineEx(
+                                new Vector2(originScreenX, originScreenY),
+                                new Vector2(px, py),
+                                1f, fovEdgeColor);
+                        }
+                    }
+
+                    // Draw the outer arc connecting ray endpoints
+                    for (int r = 1; r < liveEnemy.FovPolygon.Count - 1; r++)
+                    {
+                        var p1 = liveEnemy.FovPolygon[r];
+                        var p2 = liveEnemy.FovPolygon[r + 1];
+                        float p1x = p1.X * tileSize + _cameraOffset.X;
+                        float p1y = p1.Y * tileSize + _cameraOffset.Y;
+                        float p2x = p2.X * tileSize + _cameraOffset.X;
+                        float p2y = p2.Y * tileSize + _cameraOffset.Y;
+
+                        DrawLineEx(
+                            new Vector2(p1x, p1y),
+                            new Vector2(p2x, p2y),
+                            1f, fovEdgeColor);
+                    }
+                }
+
                 // Green filled circle for live position
                 DrawCircle((int)liveCX, (int)liveCY, liveRadius, new Color(40, 200, 40, 180));
                 DrawCircleLines((int)liveCX, (int)liveCY, liveRadius, new Color(40, 255, 40, 255));
 
                 // Direction indicator
                 float liveDirLen = liveRadius * 0.8f;
-                float liveAngle = liveEnemy.Rotation; // Undo the -π/2 offset from EnemySystem
+                float liveAngle = liveEnemy.Rotation;
                 float liveEndX = liveCX + MathF.Cos(liveAngle) * liveDirLen;
                 float liveEndY = liveCY + MathF.Sin(liveAngle) * liveDirLen;
                 DrawLineEx(new Vector2(liveCX, liveCY), new Vector2(liveEndX, liveEndY), 2f, Color.White);
 
-                // State label
-                string stateText = liveEnemy.EnemyState.ToString();
+                // State label - include "SPOTTED!" when enemy can see player
+                string stateText = liveEnemy.CanSeePlayer ? "SPOTTED!" : liveEnemy.EnemyState.ToString();
                 int stateW = MeasureText(stateText, 14);
-                var stateColor = liveEnemy.EnemyState == Entities.EnemyState.COLLIDING
-                    ? new Color(255, 40, 40, 255)
-                    : new Color(40, 255, 40, 255);
+                Color stateColor;
+                if (liveEnemy.CanSeePlayer)
+                    stateColor = new Color(255, 0, 0, 255);
+                else if (liveEnemy.EnemyState == Entities.EnemyState.COLLIDING)
+                    stateColor = new Color(255, 40, 40, 255);
+                else
+                    stateColor = new Color(40, 255, 40, 255);
                 DrawText(stateText, (int)(liveCX - stateW / 2f), (int)(liveCY - liveRadius - 16), 14, stateColor);
             }
         }

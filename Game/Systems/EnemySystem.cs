@@ -11,9 +11,16 @@ public class EnemySystem
     private readonly InputSystem _inputSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly DoorSystem _doorSystem;
+    private MapData _mapData = null!;
+
+    // Throttled LOS update
+    private float _losAccumulator;
+    private const float LosInterval = 1f / 11f; // ~11 checks per second
+    private const int FovRayCount = 48; // Number of rays for FOV polygon
+    private static readonly Random _random = new();
 
     public List<Enemy> Enemies => _enemies;
-    public EnemySystem(Player player,InputSystem inputSystem, CollisionSystem collisionSystem, DoorSystem doorSystem)
+    public EnemySystem(Player player, InputSystem inputSystem, CollisionSystem collisionSystem, DoorSystem doorSystem)
     {
         _inputSystem = inputSystem;
         _player = player;
@@ -26,9 +33,13 @@ public class EnemySystem
     /// Rebuild the enemy list from MapData enemy placements.
     /// Call this when the level data has changed (e.g. after editing in the level editor).
     /// </summary>
-    public void Rebuild(List<EnemyPlacement> placements)
+    public void Rebuild(List<EnemyPlacement> placements, MapData? mapData = null)
     {
+        if (mapData != null)
+            _mapData = mapData;
+
         _enemies.Clear();
+        _losAccumulator = 0f;
         
         foreach (var placement in placements)
         {
@@ -152,5 +163,91 @@ public class EnemySystem
                 enemy.EnemyState = (EnemyState)(state % 6);
             }
         }
+
+        // Throttled line-of-sight and FOV polygon update
+        _losAccumulator += deltaTime;
+        if (_losAccumulator >= LosInterval)
+        {
+            _losAccumulator -= LosInterval;
+            UpdateLineOfSight();
+        }
+    }
+
+    /// <summary>
+    /// Check line of sight for all enemies and regenerate their FOV polygons.
+    /// Called at a throttled rate (LosInterval).
+    /// </summary>
+    private void UpdateLineOfSight()
+    {
+        if (_mapData == null) return;
+
+        float quadSize = LevelData.QuadSize;
+        // Enemy world positions are at tile corners (TileX * QuadSize).
+        // Shift by +0.5 to cast from tile centers, matching the visual position.
+        var playerTile = new Vector2(
+            _player.Position.X / quadSize + 0.5f,
+            _player.Position.Z / quadSize + 0.5f);
+
+        var doors = _doorSystem.Doors;
+
+        foreach (var enemy in _enemies)
+        {
+            var enemyTile = new Vector2(
+                enemy.Position.X / quadSize + 0.5f,
+                enemy.Position.Z / quadSize + 0.5f);
+
+            // The enemy's facing angle in 2D tile space
+            // Enemy.Rotation is set via Atan2(dir.X, -dir.Z) - PI/2 during movement
+            // For tile-space (X right, Y down), we use Rotation directly
+            float facingAngle = enemy.Rotation;
+
+            // 1. Generate FOV polygon for visualization
+            enemy.FovPolygon = LineOfSight.GenerateFovPolygon(
+                _mapData, doors, enemyTile, facingAngle,
+                enemy.FovHalfAngle * 2f, enemy.SightRange, FovRayCount);
+
+            // 2. Distance check: skip if too far
+            float distTiles = Vector2.Distance(enemyTile, playerTile);
+            if (distTiles > enemy.SightRange)
+            {
+                enemy.CanSeePlayer = false;
+                continue;
+            }
+
+            // 3. FOV angle check: is the player within the enemy's field of view?
+            Vector2 toPlayer = playerTile - enemyTile;
+            float angleToPlayer = MathF.Atan2(toPlayer.Y, toPlayer.X);
+            float angleDiff = NormalizeAngle(angleToPlayer - facingAngle);
+            if (MathF.Abs(angleDiff) > enemy.FovHalfAngle)
+            {
+                enemy.CanSeePlayer = false;
+                continue;
+            }
+
+            // 4. DDA ray check: is there a clear path?
+            bool clearPath = LineOfSight.CanSee(_mapData, doors, enemyTile, playerTile);
+            if (!clearPath)
+            {
+                enemy.CanSeePlayer = false;
+                continue;
+            }
+
+            // 5. Distance-based probability
+            // At distance 0 -> 100% chance, at max range -> ~5% chance (linear falloff)
+            float detectionChance = 1f - 0.95f * (distTiles / enemy.SightRange);
+            detectionChance = Math.Clamp(detectionChance, 0.05f, 1f);
+
+            enemy.CanSeePlayer = _random.NextSingle() <= detectionChance;
+        }
+    }
+
+    /// <summary>
+    /// Normalize an angle to [-PI, PI] range.
+    /// </summary>
+    private static float NormalizeAngle(float angle)
+    {
+        while (angle > MathF.PI) angle -= 2f * MathF.PI;
+        while (angle < -MathF.PI) angle += 2f * MathF.PI;
+        return angle;
     }
 }

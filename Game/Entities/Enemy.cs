@@ -46,6 +46,29 @@ public class Enemy
     /// The enemy's starting position, used to return after completing the patrol loop.
     /// </summary>
     public Vector3 PatrolOrigin { get; set; }
+
+    // --- Line of Sight ---
+
+    /// <summary>
+    /// Whether the enemy can currently see the player.
+    /// </summary>
+    public bool CanSeePlayer { get; set; }
+
+    /// <summary>
+    /// The enemy's field-of-view half-angle in radians (total FOV = 2 * this).
+    /// </summary>
+    public float FovHalfAngle { get; set; } = MathF.PI / 3f; // 60 degrees half = 120 total
+
+    /// <summary>
+    /// Maximum sight range in tile units.
+    /// </summary>
+    public float SightRange { get; set; } = 12f;
+
+    /// <summary>
+    /// FOV polygon endpoints in tile-space for editor visualization.
+    /// First point is the enemy's origin, subsequent points are ray hit positions.
+    /// </summary>
+    public List<Vector2> FovPolygon { get; set; } = new();
 }
 
 public class EnemyGuard : Enemy
