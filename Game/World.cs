@@ -31,6 +31,8 @@ public class World : IScene
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
 
+    public EnemySystem EnemySystem => _enemySystem;
+
     public World(MapData mapData)
     {
         int screenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
@@ -168,6 +170,10 @@ public class World : IScene
             _minimapSystem.Render(_player);
         }
         
+        // Draw debug overlays
+        int renderW = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
+        int renderH = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+        Debug.DrawWorldOverlays(_inputState.IsDebugEnabled, _player.Camera, renderW, renderH);
         Debug.Draw(_inputState.IsDebugEnabled);
         
         EndDrawing();

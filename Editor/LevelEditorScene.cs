@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Systems;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -58,6 +59,10 @@ public class LevelEditorScene : IScene
     private const float MaxGuiScale = 4.0f;
     private const float GuiScaleStep = 0.25f;
 
+    // Simulation
+    private readonly EnemySystem _enemySystem;
+    private bool _isSimulating;
+
     // File dialog state
     private bool _showSaveDialog;
     private bool _showLoadJsonDialog;
@@ -68,9 +73,10 @@ public class LevelEditorScene : IScene
     private string _statusMessage = "";
     private float _statusTimer;
 
-    public LevelEditorScene(MapData mapData)
+    public LevelEditorScene(MapData mapData, EnemySystem enemySystem)
     {
         _mapData = mapData;
+        _enemySystem = enemySystem;
 
         // Center the map on screen initially (account for zoom)
         float mapPixelWidth = mapData.Width * BaseTileSize * _zoom;
@@ -116,6 +122,7 @@ public class LevelEditorScene : IScene
 
     public void OnExit()
     {
+        _isSimulating = false;
     }
 
     public void Update(float deltaTime)
@@ -152,6 +159,23 @@ public class LevelEditorScene : IScene
         if (_statusTimer > 0)
         {
             _statusTimer -= deltaTime;
+        }
+
+        // Toggle simulation with P key
+        if (IsKeyPressed(KeyboardKey.P))
+        {
+            _isSimulating = !_isSimulating;
+            if (_isSimulating)
+            {
+                // Rebuild enemies from current editor data before simulating
+                _enemySystem.Rebuild(_mapData.Enemies);
+            }
+        }
+
+        // Tick enemy system when simulating
+        if (_isSimulating)
+        {
+            _enemySystem.Update(deltaTime);
         }
 
         // Don't handle map input when ImGui wants the mouse
@@ -500,6 +524,26 @@ public class LevelEditorScene : IScene
                 ImGui.Text($"Scale: {_guiScale:F2}x");
 
                 ImGui.EndMenu();
+            }
+
+            if (ImGui.BeginMenu("Simulation"))
+            {
+                if (ImGui.MenuItem(_isSimulating ? "Stop Simulation" : "Start Simulation", "P"))
+                {
+                    _isSimulating = !_isSimulating;
+                    if (_isSimulating)
+                    {
+                        _enemySystem.Rebuild(_mapData.Enemies);
+                    }
+                }
+                ImGui.EndMenu();
+            }
+
+            // Show simulation status in menu bar
+            if (_isSimulating)
+            {
+                ImGui.SameLine(ImGui.GetWindowWidth() - 250);
+                ImGui.TextColored(new Vector4(0.3f, 1f, 0.3f, 1f), "SIMULATING");
             }
 
             ImGui.EndMainMenuBar();
@@ -1071,6 +1115,42 @@ public class LevelEditorScene : IScene
                 float lastWpX = (lastWp.TileX + 0.5f) * tileSize + _cameraOffset.X;
                 float lastWpY = (lastWp.TileY + 0.5f) * tileSize + _cameraOffset.Y;
                 DrawLineEx(new Vector2(lastWpX, lastWpY), mouseScreen, 1f, new Color(255, 200, 0, 120));
+            }
+        }
+
+        // When simulating, draw live enemy positions as green circles
+        if (_isSimulating && _enemySystem.Enemies != null)
+        {
+            float liveRadius = tileSize * 0.3f;
+            float quadSize = Utilities.LevelData.QuadSize;
+
+            foreach (var liveEnemy in _enemySystem.Enemies)
+            {
+                // Convert world-space position back to tile-space for the 2D editor view
+                float tilePosX = liveEnemy.Position.X / quadSize;
+                float tilePosZ = liveEnemy.Position.Z / quadSize;
+
+                float liveCX = (tilePosX + 0.5f) * tileSize + _cameraOffset.X;
+                float liveCY = (tilePosZ + 0.5f) * tileSize + _cameraOffset.Y;
+
+                // Green filled circle for live position
+                DrawCircle((int)liveCX, (int)liveCY, liveRadius, new Color(40, 200, 40, 180));
+                DrawCircleLines((int)liveCX, (int)liveCY, liveRadius, new Color(40, 255, 40, 255));
+
+                // Direction indicator
+                float liveDirLen = liveRadius * 0.8f;
+                float liveAngle = liveEnemy.Rotation; // Undo the -π/2 offset from EnemySystem
+                float liveEndX = liveCX + MathF.Cos(liveAngle) * liveDirLen;
+                float liveEndY = liveCY + MathF.Sin(liveAngle) * liveDirLen;
+                DrawLineEx(new Vector2(liveCX, liveCY), new Vector2(liveEndX, liveEndY), 2f, Color.White);
+
+                // State label
+                string stateText = liveEnemy.EnemyState.ToString();
+                int stateW = MeasureText(stateText, 14);
+                var stateColor = liveEnemy.EnemyState == Entities.EnemyState.COLLIDING
+                    ? new Color(255, 40, 40, 255)
+                    : new Color(40, 255, 40, 255);
+                DrawText(stateText, (int)(liveCX - stateW / 2f), (int)(liveCY - liveRadius - 16), 14, stateColor);
             }
         }
     }

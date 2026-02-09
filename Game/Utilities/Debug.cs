@@ -1,8 +1,11 @@
 namespace Game.Utilities;
+using System.Numerics;
 using rlImGui_cs;
+using Raylib_cs;
 using Game.Entities;
 using Game.Systems;
 using ImGuiNET;
+using static Raylib_cs.Raylib;
 
 public static class Debug
 {
@@ -22,6 +25,45 @@ public static class Debug
         _enemySystem = enemySystem;
         
         rlImGui.Setup(true);
+    }
+
+    /// <summary>
+    /// Draw screen-space debug overlays for entities in the 3D world.
+    /// Must be called after compositing the scene to the screen (between BeginDrawing/EndDrawing).
+    /// </summary>
+    public static void DrawWorldOverlays(bool isDebugEnabled, Camera3D camera, int renderWidth, int renderHeight)
+    {
+        if (!isDebugEnabled || _enemySystem?.Enemies == null)
+            return;
+
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
+        float scaleX = (float)screenW / renderWidth;
+        float scaleY = (float)screenH / renderHeight;
+
+        foreach (var enemy in _enemySystem.Enemies)
+        {
+            if (enemy.EnemyState != EnemyState.COLLIDING)
+                continue;
+
+            // Project the enemy's position (slightly above head) to the render texture's screen space
+            var labelPos3D = enemy.Position;
+            var screenPos = GetWorldToScreenEx(labelPos3D, camera, renderWidth, renderHeight);
+
+            // Scale from render texture coords to actual screen coords
+            float sx = screenPos.X * scaleX;
+            float sy = screenPos.Y * scaleY;
+
+            // Only draw if on screen
+            if (sx >= 0 && sx < screenW && sy >= 0 && sy < screenH)
+            {
+                const string text = "COLLIDING";
+                const int fontSize = 24;
+                int textW = MeasureText(text, fontSize);
+                DrawText(text, (int)(sx - textW / 2f), (int)(sy - fontSize), fontSize,
+                    new Raylib_cs.Color(255, 40, 40, 255));
+            }
+        }
     }
 
     public static void Draw(bool isDebugEnabled)
