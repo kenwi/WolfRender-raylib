@@ -34,7 +34,11 @@ public class EnemySystem
                     placement.TileX * LevelData.QuadSize,
                     2f,
                     placement.TileY * LevelData.QuadSize),
-                Rotation = placement.Rotation
+                Rotation = placement.Rotation,
+                PatrolPath = placement.PatrolPath.Select(wp => new Vector3(
+                    wp.TileX * LevelData.QuadSize,
+                    2f,
+                    wp.TileY * LevelData.QuadSize)).ToList()
             };
             _enemies.Add(enemy);
         }
@@ -44,6 +48,14 @@ public class EnemySystem
     {
         foreach (var enemy in _enemies)
         {
+            // Patrol path check (placeholder for future movement logic)
+            if (enemy.HasPatrolPath)
+            {
+                // Enemy has a patrol path to follow
+                // TODO: Implement patrol movement
+                ;
+            }
+
             Vector2 playerEnemyVector = new Vector2(enemy.Position.X - _player.Position.X,
                 enemy.Position.Z - _player.Position.Z);
 

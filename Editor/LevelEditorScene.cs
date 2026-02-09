@@ -44,6 +44,11 @@ public class LevelEditorScene : IScene
     private int _selectedEnemyIndex = -1;
     private bool _isDraggingEnemy;
 
+    // Patrol path editing
+    private bool _isEditingPatrolPath;
+    private int _patrolEditEnemyIndex = -1;
+    private List<PatrolWaypoint> _patrolPathInProgress = new();
+
     // Pre-rendered rotated door texture for palette display
     private RenderTexture2D _rotatedDoorTexture;
 
@@ -179,6 +184,45 @@ public class LevelEditorScene : IScene
             if (IsKeyDown(KeyboardKey.D)) _cameraOffset.X -= panSpeed;
         }
 
+        // Patrol path editing mode: clicks add waypoints, Enter confirms, Escape cancels
+        if (_isEditingPatrolPath)
+        {
+            if (!imGuiWantsMouse && IsMouseButtonPressed(MouseButton.Left))
+            {
+                var paintPos = ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                if (px >= 0 && px < _mapData.Width && py >= 0 && py < _mapData.Height)
+                {
+                    _patrolPathInProgress.Add(new PatrolWaypoint { TileX = px, TileY = py });
+                }
+            }
+
+            if (IsKeyPressed(KeyboardKey.Enter) || IsKeyPressed(KeyboardKey.KpEnter))
+            {
+                // Confirm patrol path
+                if (_patrolEditEnemyIndex >= 0 && _patrolEditEnemyIndex < _mapData.Enemies.Count)
+                {
+                    _mapData.Enemies[_patrolEditEnemyIndex].PatrolPath = new List<PatrolWaypoint>(_patrolPathInProgress);
+                }
+                _isEditingPatrolPath = false;
+                _patrolPathInProgress.Clear();
+                _patrolEditEnemyIndex = -1;
+            }
+
+            if (IsKeyPressed(KeyboardKey.Escape))
+            {
+                // Cancel patrol path editing
+                _isEditingPatrolPath = false;
+                _patrolPathInProgress.Clear();
+                _patrolEditEnemyIndex = -1;
+            }
+
+            // Skip normal input handling while editing path
+        }
+        else
+        {
+
         // Paint tiles / place enemies with left mouse button
         bool isEnemyLayer = _layers[_activeLayerIndex].Name == EnemiesLayerName;
 
@@ -269,6 +313,8 @@ public class LevelEditorScene : IScene
             _mapData.Enemies.RemoveAt(_selectedEnemyIndex);
             _selectedEnemyIndex = -1;
         }
+
+        } // end of: else (not editing patrol path)
 
         // Ctrl+/- for GUI scaling, plain +/- for zoom
         bool ctrlHeld = IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl);
@@ -372,6 +418,13 @@ public class LevelEditorScene : IScene
 
         DrawText("Level Editor - F1 to return to game", 10, GetScreenHeight() - 70, 20, Color.White);
         DrawText($"Zoom: {_zoom:F2}x", 10, GetScreenHeight() - 45, 20, Color.LightGray);
+
+        if (_isEditingPatrolPath)
+        {
+            const string msg = "EDITING PATROL PATH - LMB: Add waypoint | Enter: Confirm | Esc: Cancel";
+            int msgW = MeasureText(msg, 24);
+            DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
+        }
 
         // Status message
         if (_statusTimer > 0 && !string.IsNullOrEmpty(_statusMessage))
@@ -1001,6 +1054,45 @@ public class LevelEditorScene : IScene
             float endX = centerX + MathF.Cos(angle) * dirLen;
             float endY = centerY + MathF.Sin(angle) * dirLen;
             DrawLineEx(new Vector2(centerX, centerY), new Vector2(endX, endY), 2f, Color.White);
+
+            // Draw saved patrol path
+            if (enemy.ShowPatrolPath && enemy.PatrolPath.Count > 0)
+            {
+                DrawPatrolPath(enemy, enemy.PatrolPath, tileSize, new Color(0, 200, 255, 200));
+            }
+
+            // Draw in-progress patrol path for the enemy being edited
+            if (_isEditingPatrolPath && _patrolEditEnemyIndex == i && _patrolPathInProgress.Count > 0)
+            {
+                DrawPatrolPath(enemy, _patrolPathInProgress, tileSize, new Color(255, 200, 0, 220));
+
+                // Draw a dashed line from the last waypoint to the mouse cursor
+                var lastWp = _patrolPathInProgress[^1];
+                float lastWpX = (lastWp.TileX + 0.5f) * tileSize + _cameraOffset.X;
+                float lastWpY = (lastWp.TileY + 0.5f) * tileSize + _cameraOffset.Y;
+                DrawLineEx(new Vector2(lastWpX, lastWpY), mouseScreen, 1f, new Color(255, 200, 0, 120));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draw a patrol path as lines and waypoint dots from the enemy's position through each waypoint.
+    /// </summary>
+    private void DrawPatrolPath(EnemyPlacement enemy, List<PatrolWaypoint> path, float tileSize, Color color)
+    {
+        float prevX = (enemy.TileX + 0.5f) * tileSize + _cameraOffset.X;
+        float prevY = (enemy.TileY + 0.5f) * tileSize + _cameraOffset.Y;
+
+        for (int w = 0; w < path.Count; w++)
+        {
+            float wpX = (path[w].TileX + 0.5f) * tileSize + _cameraOffset.X;
+            float wpY = (path[w].TileY + 0.5f) * tileSize + _cameraOffset.Y;
+
+            DrawLineEx(new Vector2(prevX, prevY), new Vector2(wpX, wpY), 2f, color);
+            DrawCircle((int)wpX, (int)wpY, tileSize * 0.12f, color);
+
+            prevX = wpX;
+            prevY = wpY;
         }
     }
 
@@ -1058,6 +1150,60 @@ public class LevelEditorScene : IScene
         // Enemy type
         ImGui.Text($"Type: {enemy.EnemyType}");
         if (ImGui.Button("Guard")) enemy.EnemyType = "Guard";
+
+        ImGui.Spacing();
+        ImGui.Separator();
+
+        // Patrol path
+        ImGui.Text("Patrol Path");
+
+        bool showPath = enemy.ShowPatrolPath;
+        if (ImGui.Checkbox("Show Path", ref showPath))
+        {
+            enemy.ShowPatrolPath = showPath;
+        }
+
+        if (_isEditingPatrolPath && _patrolEditEnemyIndex == _selectedEnemyIndex)
+        {
+            ImGui.TextColored(new Vector4(1f, 0.8f, 0f, 1f),
+                $"Editing... ({_patrolPathInProgress.Count} waypoints)");
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB: Add waypoint");
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Enter: Confirm path");
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Escape: Cancel");
+
+            if (ImGui.Button("Cancel Editing"))
+            {
+                _isEditingPatrolPath = false;
+                _patrolPathInProgress.Clear();
+                _patrolEditEnemyIndex = -1;
+            }
+        }
+        else
+        {
+            if (enemy.PatrolPath.Count > 0)
+            {
+                ImGui.Text($"{enemy.PatrolPath.Count} waypoints");
+                for (int w = 0; w < enemy.PatrolPath.Count; w++)
+                {
+                    var wp = enemy.PatrolPath[w];
+                    ImGui.TextColored(new Vector4(0, 0.8f, 1f, 1f),
+                        $"  {w + 1}: ({wp.TileX}, {wp.TileY})");
+                }
+
+                if (ImGui.Button("Clear Path"))
+                {
+                    enemy.PatrolPath.Clear();
+                }
+                ImGui.SameLine();
+            }
+
+            if (ImGui.Button("Add Path"))
+            {
+                _isEditingPatrolPath = true;
+                _patrolEditEnemyIndex = _selectedEnemyIndex;
+                _patrolPathInProgress.Clear();
+            }
+        }
 
         ImGui.Spacing();
         ImGui.Separator();

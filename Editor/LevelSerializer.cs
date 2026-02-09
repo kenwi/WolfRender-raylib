@@ -2,12 +2,19 @@ using System.Text.Json;
 
 namespace Game.Editor;
 
+public class PatrolWaypointData
+{
+    public int TileX { get; set; }
+    public int TileY { get; set; }
+}
+
 public class EnemyPlacementData
 {
     public int TileX { get; set; }
     public int TileY { get; set; }
     public float Rotation { get; set; }
     public string EnemyType { get; set; } = "Guard";
+    public List<PatrolWaypointData> PatrolPath { get; set; } = new();
 }
 
 public class LevelFileData
@@ -43,7 +50,12 @@ public static class LevelSerializer
                 TileX = e.TileX,
                 TileY = e.TileY,
                 Rotation = e.Rotation,
-                EnemyType = e.EnemyType
+                EnemyType = e.EnemyType,
+                PatrolPath = e.PatrolPath.Select(w => new PatrolWaypointData
+                {
+                    TileX = w.TileX,
+                    TileY = w.TileY
+                }).ToList()
             }).ToList()
         };
 
@@ -68,7 +80,12 @@ public static class LevelSerializer
             TileX = e.TileX,
             TileY = e.TileY,
             Rotation = e.Rotation,
-            EnemyType = e.EnemyType
+            EnemyType = e.EnemyType,
+            PatrolPath = e.PatrolPath.Select(w => new PatrolWaypoint
+            {
+                TileX = w.TileX,
+                TileY = w.TileY
+            }).ToList()
         }).ToList();
     }
 

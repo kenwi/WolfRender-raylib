@@ -25,6 +25,16 @@ public class Enemy
     public float AngleToPlayer  { get; set; }
     public float DistanceFromPlayer { get; set; }
     public EnemyState EnemyState { get; set; }
+
+    /// <summary>
+    /// Patrol path as world-space waypoints. Empty list means no patrol.
+    /// </summary>
+    public List<Vector3> PatrolPath { get; set; } = new();
+
+    /// <summary>
+    /// Whether this enemy has a patrol path to follow.
+    /// </summary>
+    public bool HasPatrolPath => PatrolPath.Count > 0;
 }
 
 public class EnemyGuard : Enemy
