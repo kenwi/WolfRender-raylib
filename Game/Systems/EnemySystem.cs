@@ -231,13 +231,14 @@ public class EnemySystem
                 enemy.CanSeePlayer = false;
                 continue;
             }
-
+            enemy.CanSeePlayer = true;
+            enemy.EnemyState = EnemyState.NOTICING;
             // 5. Distance-based probability
             // At distance 0 -> 100% chance, at max range -> ~5% chance (linear falloff)
-            float detectionChance = 1f - 0.95f * (distTiles / enemy.SightRange);
-            detectionChance = Math.Clamp(detectionChance, 0.05f, 1f);
+            // float detectionChance = 1f - 0.95f * (distTiles / enemy.SightRange);
+            // detectionChance = Math.Clamp(detectionChance, 0.05f, 1f);
 
-            enemy.CanSeePlayer = _random.NextSingle() <= detectionChance;
+            // enemy.CanSeePlayer = _random.NextSingle() <= detectionChance;
         }
     }
 
