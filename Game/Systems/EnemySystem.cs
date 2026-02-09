@@ -10,13 +10,15 @@ public class EnemySystem
     private readonly List<Enemy> _enemies;
     private readonly InputSystem _inputSystem;
     private readonly CollisionSystem _collisionSystem;
+    private readonly DoorSystem _doorSystem;
 
     public List<Enemy> Enemies => _enemies;
-    public EnemySystem(Player player, InputSystem inputSystem, CollisionSystem collisionSystem)
+    public EnemySystem(Player player,InputSystem inputSystem, CollisionSystem collisionSystem, DoorSystem doorSystem)
     {
         _inputSystem = inputSystem;
         _player = player;
         _collisionSystem = collisionSystem;
+        _doorSystem = doorSystem;
         _enemies = new List<Enemy>();
     }
 
@@ -87,6 +89,17 @@ public class EnemySystem
                     {
                         // Wall ahead — stop and set colliding state
                         enemy.EnemyState = EnemyState.COLLIDING;
+
+                        // Check if the next position would collide with a door
+                        if (_doorSystem.IsDoorBlocking(nextPosition, enemyRadius))
+                        {
+                            var doorSearchPos = new Vector2(nextPosition.X / LevelData.QuadSize, nextPosition.Z / LevelData.QuadSize);
+                            var closestDoor = _doorSystem.FindClosestDoor(doorSearchPos);
+                            if (closestDoor != null)
+                            {
+                                _doorSystem.OpenDoor(closestDoor);
+                            }
+                        }
                     }
                     else
                     {

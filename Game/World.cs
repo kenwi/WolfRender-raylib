@@ -66,7 +66,7 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         
-        _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem);
+        _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem);
         _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
         
 
