@@ -171,6 +171,7 @@ public static class Debug
                                 EnemyState.FLEEING => new System.Numerics.Vector4(0.3f, 0.3f, 1, 1), // Blue
                                 EnemyState.ATTACKING => new System.Numerics.Vector4(1, 0.3f, 0.3f, 1), // Red
                                 EnemyState.DYING => new System.Numerics.Vector4(0.7f, 0.3f, 0.7f, 1), // Purple
+                                EnemyState.COLLIDING => new System.Numerics.Vector4(1, 0, 0, 1), // Red
                                 _ => new System.Numerics.Vector4(1, 1, 1, 1) // White
                             };
                             ImGui.TextColored(stateColor, enemy.EnemyState.ToString());

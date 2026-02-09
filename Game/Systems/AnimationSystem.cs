@@ -42,6 +42,7 @@ public class AnimationSystem
             switch (enemy.EnemyState)
             {
                 case EnemyState.IDLE:
+                case EnemyState.COLLIDING:
                     enemy.FrameRowIndex = 0;
                     break;
                 case EnemyState.WALKING:

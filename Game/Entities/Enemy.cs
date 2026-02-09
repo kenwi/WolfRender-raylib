@@ -10,7 +10,8 @@ public enum EnemyState
     NOTICING,
     FLEEING,
     ATTACKING,
-    DYING
+    DYING,
+    COLLIDING
 }
 
 public class Enemy
@@ -35,6 +36,16 @@ public class Enemy
     /// Whether this enemy has a patrol path to follow.
     /// </summary>
     public bool HasPatrolPath => PatrolPath.Count > 0;
+
+    /// <summary>
+    /// Index of the current target waypoint in the patrol path.
+    /// </summary>
+    public int CurrentWaypointIndex { get; set; }
+
+    /// <summary>
+    /// The enemy's starting position, used to return after completing the patrol loop.
+    /// </summary>
+    public Vector3 PatrolOrigin { get; set; }
 }
 
 public class EnemyGuard : Enemy

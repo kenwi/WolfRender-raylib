@@ -9,12 +9,14 @@ public class EnemySystem
     private readonly Player _player;
     private readonly List<Enemy> _enemies;
     private readonly InputSystem _inputSystem;
+    private readonly CollisionSystem _collisionSystem;
+
     public List<Enemy> Enemies => _enemies;
-    
-    public EnemySystem(Player player, InputSystem inputSystem)
+    public EnemySystem(Player player, InputSystem inputSystem, CollisionSystem collisionSystem)
     {
         _inputSystem = inputSystem;
         _player = player;
+        _collisionSystem = collisionSystem;
         _enemies = new List<Enemy>();
     }
 
@@ -28,13 +30,18 @@ public class EnemySystem
         
         foreach (var placement in placements)
         {
+            var startPos = new Vector3(
+                placement.TileX * LevelData.QuadSize,
+                2f,
+                placement.TileY * LevelData.QuadSize);
+
             var enemy = new EnemyGuard
             {
-                Position = new Vector3(
-                    placement.TileX * LevelData.QuadSize,
-                    2f,
-                    placement.TileY * LevelData.QuadSize),
+                Position = startPos,
+                PatrolOrigin = startPos,
                 Rotation = placement.Rotation,
+                MoveSpeed = 2f,
+                CurrentWaypointIndex = 0,
                 PatrolPath = placement.PatrolPath.Select(wp => new Vector3(
                     wp.TileX * LevelData.QuadSize,
                     2f,
@@ -48,12 +55,54 @@ public class EnemySystem
     {
         foreach (var enemy in _enemies)
         {
-            // Patrol path check (placeholder for future movement logic)
+            // Patrol movement: walk through waypoints, then back to origin, and loop
             if (enemy.HasPatrolPath)
             {
-                // Enemy has a patrol path to follow
-                // TODO: Implement patrol movement
-                ;
+                // Build the full loop: origin -> waypoints -> back to origin
+                // CurrentWaypointIndex 0..N-1 = patrol waypoints, N = returning to origin
+                int totalStops = enemy.PatrolPath.Count + 1; // +1 for return to origin
+                int idx = enemy.CurrentWaypointIndex % totalStops;
+
+                Vector3 target = idx < enemy.PatrolPath.Count
+                    ? enemy.PatrolPath[idx]
+                    : enemy.PatrolOrigin;
+
+                Vector3 toTarget = target - enemy.Position;
+                float distXZ = MathF.Sqrt(toTarget.X * toTarget.X + toTarget.Z * toTarget.Z);
+
+                const float arrivalThreshold = 0.5f;
+
+                if (distXZ > arrivalThreshold)
+                {
+                    // Move toward the target
+                    Vector3 direction = new Vector3(toTarget.X / distXZ, 0, toTarget.Z / distXZ);
+                    float step = enemy.MoveSpeed * deltaTime;
+                    if (step > distXZ) step = distXZ; // Don't overshoot
+
+                    Vector3 nextPosition = enemy.Position + direction * step;
+
+                    // Check if the next position would collide with a wall
+                    const float enemyRadius = 1.0f;
+                    if (_collisionSystem.CheckCollisionAtPosition(nextPosition, enemyRadius))
+                    {
+                        // Wall ahead — stop and set colliding state
+                        enemy.EnemyState = EnemyState.COLLIDING;
+                    }
+                    else
+                    {
+                        enemy.Position = nextPosition;
+
+                        // Update rotation to face movement direction
+                        enemy.Rotation = MathF.Atan2(direction.X, -direction.Z) - MathF.PI / 2f;
+                        enemy.EnemyState = EnemyState.WALKING;
+                    }
+                }
+                else
+                {
+                    // Snap to target and advance to next waypoint
+                    enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
+                    enemy.CurrentWaypointIndex = (enemy.CurrentWaypointIndex + 1) % totalStops;
+                }
             }
 
             Vector2 playerEnemyVector = new Vector2(enemy.Position.X - _player.Position.X,

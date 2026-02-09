@@ -64,7 +64,7 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         
-        _enemySystem = new EnemySystem(_player, _inputSystem);
+        _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem);
         _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
         
 
@@ -76,8 +76,8 @@ public class World : IScene
     public void OnEnter()
     {
         // Hide and center cursor for FPS-style controls
-        HideCursor();
-        _inputSystem.CenterMouse();
+        // HideCursor();
+        // _inputSystem.CenterMouse();
 
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);

@@ -16,7 +16,7 @@ public class CollisionSystem
         _doorSystem = doorSystem;
     }
 
-    private bool CheckCollisionAtPosition(Vector3 position, float radius)
+    public bool CheckCollisionAtPosition(Vector3 position, float radius)
     {
         // Check center point
         int tileX = (int)(position.X / TileSize + 0.5f);

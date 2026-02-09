@@ -25,8 +25,8 @@ public class InputSystem
 {
     private bool _isMouseFree = false;
     private bool _isGamePaused = true;
-    private bool _isDebugEnabled = true;
-    private bool _isMinimapEnabled = true;
+    private bool _isDebugEnabled = false;
+    private bool _isMinimapEnabled = false;
 
     public void Update()
     {
