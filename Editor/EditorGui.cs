@@ -33,6 +33,12 @@ public class EditorGui
     // Pre-rendered rotated door texture for palette display
     private RenderTexture2D _rotatedDoorTexture;
 
+    // Window visibility toggles
+    private bool _showLayers = true;
+    private bool _showTilePalette = true;
+    private bool _showCursorInfo = true;
+    private bool _showEnemyProperties = true;
+
     public float GuiScale => _guiScale;
     public string StatusMessage => _statusMessage;
     public float StatusTimer => _statusTimer;
@@ -155,6 +161,23 @@ public class EditorGui
 
                 ImGui.Separator();
                 ImGui.Text($"Scale: {_guiScale:F2}x");
+
+                ImGui.EndMenu();
+            }
+
+            if (ImGui.BeginMenu("Window"))
+            {
+                if (ImGui.MenuItem("Layers", null, _showLayers))
+                    _showLayers = !_showLayers;
+
+                if (ImGui.MenuItem("Tile Palette", null, _showTilePalette))
+                    _showTilePalette = !_showTilePalette;
+
+                if (ImGui.MenuItem("Cursor Info", null, _showCursorInfo))
+                    _showCursorInfo = !_showCursorInfo;
+
+                if (ImGui.MenuItem("Enemy Properties", null, _showEnemyProperties))
+                    _showEnemyProperties = !_showEnemyProperties;
 
                 ImGui.EndMenu();
             }
@@ -302,8 +325,10 @@ public class EditorGui
 
     public void RenderLayerPanel(List<EditorLayer> layers, ref int activeLayerIndex)
     {
+        if (!_showLayers) return;
+
         ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 45), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Layers", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.Begin("Layers", ref _showLayers, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text("Render Order (top = drawn first)");
@@ -382,8 +407,10 @@ public class EditorGui
 
     public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, ref uint selectedTileId)
     {
+        if (!_showTilePalette) return;
+
         ImGui.SetNextWindowPos(new Vector2(10, 45), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Tile Palette", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.Begin("Tile Palette", ref _showTilePalette, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text($"Active Layer: {layers[activeLayerIndex].Name}");
@@ -472,6 +499,8 @@ public class EditorGui
         int tileX, int tileY, Vector2 worldPos, bool tileInBounds,
         bool cursorInfoFollowsMouse, List<EditorLayer> layers, string enemiesLayerName)
     {
+        if (!_showCursorInfo) return;
+
         if (cursorInfoFollowsMouse)
         {
             var mouse = GetMousePosition();
@@ -490,7 +519,7 @@ public class EditorGui
             flags |= ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoTitleBar;
         }
 
-        ImGui.Begin("Cursor Info", flags);
+        ImGui.Begin("Cursor Info", ref _showCursorInfo, flags);
         ImGui.SetWindowFontScale(_guiScale);
 
         if (tileInBounds)
@@ -548,13 +577,14 @@ public class EditorGui
         ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
         List<PatrolWaypoint> patrolPathInProgress)
     {
+        if (!_showEnemyProperties) return;
         if (selectedEnemyIndex < 0 || selectedEnemyIndex >= _mapData.Enemies.Count)
             return;
 
         var enemy = _mapData.Enemies[selectedEnemyIndex];
 
         ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 500), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Enemy Properties", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.Begin("Enemy Properties", ref _showEnemyProperties, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text($"Enemy #{selectedEnemyIndex}");
