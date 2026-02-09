@@ -58,33 +58,15 @@ public static class LineOfSight
             sideDistY = (mapY + 1.0f - posY) * deltaDistY;
 
         // Pre-check: if the origin is inside a door tile, test intersection with
-        // the door's midpoint line. The DDA loop only checks tiles it steps INTO,
+        // the door's remaining segment. The DDA loop only checks tiles it steps INTO,
         // so the starting tile would otherwise be skipped.
-        // The ray exits the starting tile at exitDist; the midpoint hit must be before that.
         var startDoor = FindDoorAtTile(doors, mapX, mapY);
-        if (startDoor != null && startDoor.DoorState == DoorState.CLOSED)
+        if (startDoor != null)
         {
             float exitDist = MathF.Min(sideDistX, sideDistY);
-            if (startDoor.DoorRotation == DoorRotation.HORIZONTAL)
-            {
-                float doorY = mapY + 0.5f;
-                if (MathF.Abs(direction.Y) > 0.0001f)
-                {
-                    float hitDist = (doorY - origin.Y) / direction.Y;
-                    if (hitDist > 0 && hitDist <= exitDist && hitDist <= maxDistance)
-                        return origin + direction * hitDist;
-                }
-            }
-            else // VERTICAL
-            {
-                float doorX = mapX + 0.5f;
-                if (MathF.Abs(direction.X) > 0.0001f)
-                {
-                    float hitDist = (doorX - origin.X) / direction.X;
-                    if (hitDist > 0 && hitDist <= exitDist && hitDist <= maxDistance)
-                        return origin + direction * hitDist;
-                }
-            }
+            var preHit = TryHitDoorSegment(startDoor, mapX, mapY, origin, direction, 0f, exitDist, maxDistance);
+            if (preHit.HasValue)
+                return preHit.Value;
         }
 
         // DDA loop
@@ -116,41 +98,67 @@ public static class LineOfSight
             if (mapData.GetTile(mapData.Walls, mapX, mapY) > 0)
                 return origin + direction * distanceTraveled;
 
-            // Doors are line segments at the midpoint of their tile, not solid walls.
-            // Check for a precise ray-door intersection at the center of the tile.
-            // The hit must fall within this tile's extent along the ray:
-            //   entry = distanceTraveled, exit = min(sideDistX, sideDistY).
+            // Doors are line segments at the midpoint of their tile.
+            // The blocking segment shrinks as the door slides open.
             var door = FindDoorAtTile(doors, mapX, mapY);
-            if (door != null && door.DoorState == DoorState.CLOSED)
+            if (door != null)
             {
                 float exitDist = MathF.Min(sideDistX, sideDistY);
-                if (door.DoorRotation == DoorRotation.HORIZONTAL)
-                {
-                    // HORIZONTAL door: line at Y = tileY + 0.5
-                    float doorY = mapY + 0.5f;
-                    if (MathF.Abs(direction.Y) > 0.0001f)
-                    {
-                        float hitDist = (doorY - origin.Y) / direction.Y;
-                        if (hitDist >= distanceTraveled && hitDist <= exitDist && hitDist <= maxDistance)
-                            return origin + direction * hitDist;
-                    }
-                }
-                else // VERTICAL
-                {
-                    // VERTICAL door: line at X = tileX + 0.5
-                    float doorX = mapX + 0.5f;
-                    if (MathF.Abs(direction.X) > 0.0001f)
-                    {
-                        float hitDist = (doorX - origin.X) / direction.X;
-                        if (hitDist >= distanceTraveled && hitDist <= exitDist && hitDist <= maxDistance)
-                            return origin + direction * hitDist;
-                    }
-                }
+                var doorHit = TryHitDoorSegment(door, mapX, mapY, origin, direction, distanceTraveled, exitDist, maxDistance);
+                if (doorHit.HasValue)
+                    return doorHit.Value;
             }
         }
 
         // Ray reached max distance without hitting anything
         return origin + direction * maxDistance;
+    }
+
+    /// <summary>
+    /// Test the ray against the door's remaining blocking segment.
+    /// The door slides in +X (HORIZONTAL) or +Y (VERTICAL), so the blocking
+    /// segment shrinks from [Position, tileEdge] as the door opens.
+    /// Returns the hit position, or null if the ray misses the segment.
+    /// </summary>
+    private static Vector2? TryHitDoorSegment(
+        Door door, int tileX, int tileY,
+        Vector2 origin, Vector2 direction,
+        float minDist, float maxDist, float maxRange)
+    {
+        if (door.DoorRotation == DoorRotation.HORIZONTAL)
+        {
+            // HORIZONTAL door: line at Y = tileY + 0.5, slides in +X
+            // Blocking segment X range: [door.Position.X, tileX + 1]
+            float doorY = tileY + 0.5f;
+            if (MathF.Abs(direction.Y) > 0.0001f)
+            {
+                float hitDist = (doorY - origin.Y) / direction.Y;
+                if (hitDist > minDist && hitDist <= maxDist && hitDist <= maxRange)
+                {
+                    float hitX = origin.X + direction.X * hitDist;
+                    if (hitX >= door.Position.X && hitX <= tileX + 1)
+                        return origin + direction * hitDist;
+                }
+            }
+        }
+        else // VERTICAL
+        {
+            // VERTICAL door: line at X = tileX + 0.5, slides in +Y
+            // Blocking segment Y range: [door.Position.Y, tileY + 1]
+            float doorX = tileX + 0.5f;
+            if (MathF.Abs(direction.X) > 0.0001f)
+            {
+                float hitDist = (doorX - origin.X) / direction.X;
+                if (hitDist > minDist && hitDist <= maxDist && hitDist <= maxRange)
+                {
+                    float hitY = origin.Y + direction.Y * hitDist;
+                    if (hitY >= door.Position.Y && hitY <= tileY + 1)
+                        return origin + direction * hitDist;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
