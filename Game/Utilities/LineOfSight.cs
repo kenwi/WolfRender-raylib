@@ -62,7 +62,7 @@ public static class LineOfSight
         // so the starting tile would otherwise be skipped.
         // The ray exits the starting tile at exitDist; the midpoint hit must be before that.
         var startDoor = FindDoorAtTile(doors, mapX, mapY);
-        if (startDoor != null && startDoor.DoorState != DoorState.OPEN)
+        if (startDoor != null && startDoor.DoorState == DoorState.CLOSED)
         {
             float exitDist = MathF.Min(sideDistX, sideDistY);
             if (startDoor.DoorRotation == DoorRotation.HORIZONTAL)
@@ -121,7 +121,7 @@ public static class LineOfSight
             // The hit must fall within this tile's extent along the ray:
             //   entry = distanceTraveled, exit = min(sideDistX, sideDistY).
             var door = FindDoorAtTile(doors, mapX, mapY);
-            if (door != null && door.DoorState != DoorState.OPEN)
+            if (door != null && door.DoorState == DoorState.CLOSED)
             {
                 float exitDist = MathF.Min(sideDistX, sideDistY);
                 if (door.DoorRotation == DoorRotation.HORIZONTAL)
