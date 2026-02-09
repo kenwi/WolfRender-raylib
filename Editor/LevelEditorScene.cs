@@ -61,6 +61,7 @@ public class LevelEditorScene : IScene
 
     // Simulation
     private readonly EnemySystem _enemySystem;
+    private readonly DoorSystem _doorSystem;
     private bool _isSimulating;
 
     // File dialog state
@@ -73,10 +74,11 @@ public class LevelEditorScene : IScene
     private string _statusMessage = "";
     private float _statusTimer;
 
-    public LevelEditorScene(MapData mapData, EnemySystem enemySystem)
+    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem)
     {
         _mapData = mapData;
         _enemySystem = enemySystem;
+        _doorSystem = doorSystem;
 
         // Center the map on screen initially (account for zoom)
         float mapPixelWidth = mapData.Width * BaseTileSize * _zoom;
@@ -167,15 +169,17 @@ public class LevelEditorScene : IScene
             _isSimulating = !_isSimulating;
             if (_isSimulating)
             {
-                // Rebuild enemies from current editor data before simulating
+                // Rebuild enemies and doors from current editor data before simulating
                 _enemySystem.Rebuild(_mapData.Enemies);
+                _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
             }
         }
 
-        // Tick enemy system when simulating
+        // Tick game systems when simulating
         if (_isSimulating)
         {
             _enemySystem.Update(deltaTime);
+            _doorSystem.Animate(deltaTime);
         }
 
         // Don't handle map input when ImGui wants the mouse
@@ -410,7 +414,15 @@ public class LevelEditorScene : IScene
             }
             else
             {
-                RenderLayer(layer, tileSize);
+                // When simulating, render doors at their live animated positions instead of static tiles
+                if (_isSimulating && layer.Name == "Doors")
+                {
+                    RenderLiveDoors(tileSize);
+                }
+                else
+                {
+                    RenderLayer(layer, tileSize);
+                }
             }
         }
 
@@ -534,6 +546,7 @@ public class LevelEditorScene : IScene
                     if (_isSimulating)
                     {
                         _enemySystem.Rebuild(_mapData.Enemies);
+                        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
                     }
                 }
                 ImGui.EndMenu();
@@ -1042,6 +1055,41 @@ public class LevelEditorScene : IScene
         }
 
         ImGui.End();
+    }
+
+    /// <summary>
+    /// Render doors at their live animated positions during simulation.
+    /// </summary>
+    private void RenderLiveDoors(float tileSize)
+    {
+        if (_doorSystem.Doors == null) return;
+
+        int doorTexIndex = (int)Entities.DoorRotation.HORIZONTAL - 1; // texture index 6
+        if (doorTexIndex < 0 || doorTexIndex >= _mapData.Textures.Count) return;
+        var texture = _mapData.Textures[doorTexIndex];
+
+        foreach (var door in _doorSystem.Doors)
+        {
+            float drawX = door.Position.X * tileSize + _cameraOffset.X;
+            float drawY = door.Position.Y * tileSize + _cameraOffset.Y;
+
+            bool isVertical = door.DoorRotation == Entities.DoorRotation.VERTICAL;
+            float rotation = isVertical ? 90f : 0f;
+            var origin = isVertical
+                ? new Vector2(tileSize / 2f, tileSize / 2f)
+                : Vector2.Zero;
+            var destX = isVertical ? drawX + tileSize / 2f : drawX;
+            var destY = isVertical ? drawY + tileSize / 2f : drawY;
+
+            DrawTexturePro(
+                texture,
+                new Rectangle(0, 0, texture.Width, texture.Height),
+                new Rectangle(destX, destY, tileSize, tileSize),
+                origin,
+                rotation,
+                Color.White
+            );
+        }
     }
 
     /// <summary>

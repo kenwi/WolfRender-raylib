@@ -32,6 +32,7 @@ public class World : IScene
     private readonly EnemySystem _enemySystem;
 
     public EnemySystem EnemySystem => _enemySystem;
+    public DoorSystem DoorSystem => _doorSystem;
 
     public World(MapData mapData)
     {
