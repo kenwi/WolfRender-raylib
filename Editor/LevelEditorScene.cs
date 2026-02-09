@@ -95,7 +95,7 @@ public class LevelEditorScene : IScene
         {
             new() { Name = "Floor", Tiles = mapData.Floor },
             new() { Name = "Walls", Tiles = mapData.Walls },
-            new() { Name = "Ceiling", Tiles = mapData.Ceiling },
+            new() { Name = "Ceiling", Tiles = mapData.Ceiling, IsVisible = false },
             new() { Name = "Doors", Tiles = mapData.Doors },
             new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
         };
