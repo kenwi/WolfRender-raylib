@@ -81,14 +81,14 @@ public class Application
         };
 
         var mapData = new MapData { Textures = textures };
-        Editor.LevelSerializer.LoadFromTmx(mapData, "resources/map1.tmx");
+        Editor.LevelSerializer.LoadFromJson(mapData, "resources/level.json");
 
         // Seed initial enemy placements (previously hardcoded in EnemySystem)
-        mapData.Enemies = new List<EnemyPlacement>
-        {
-            new() { TileX = 27, TileY = 27, Rotation = 0, EnemyType = "Guard" },
-            new() { TileX = 30, TileY = 26, Rotation = 0, EnemyType = "Guard" },
-        };
+        // mapData.Enemies = new List<EnemyPlacement>
+        // {
+        //     new() { TileX = 27, TileY = 27, Rotation = 0, EnemyType = "Guard" },
+        //     new() { TileX = 30, TileY = 26, Rotation = 0, EnemyType = "Guard" },
+        // };
 
         return mapData;
     }
