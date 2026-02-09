@@ -1232,8 +1232,8 @@ public class LevelEditorScene : IScene
 
                     // Choose color based on whether the enemy can see the player
                     var fovFillColor = liveEnemy.CanSeePlayer
-                        ? new Color(255, 40, 40, 80)   // Red when player spotted
-                        : new Color(255, 200, 0, 60);  // Yellow when scanning
+                        ? new Color(255, 40, 40, 200)   // Red when player spotted
+                        : new Color(255, 200, 0, 200);  // Yellow when scanning
 
                     var fovEdgeColor = liveEnemy.CanSeePlayer
                         ? new Color(255, 80, 80, 180)

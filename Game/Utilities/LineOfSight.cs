@@ -57,6 +57,36 @@ public static class LineOfSight
         else
             sideDistY = (mapY + 1.0f - posY) * deltaDistY;
 
+        // Pre-check: if the origin is inside a door tile, test intersection with
+        // the door's midpoint line. The DDA loop only checks tiles it steps INTO,
+        // so the starting tile would otherwise be skipped.
+        // The ray exits the starting tile at exitDist; the midpoint hit must be before that.
+        var startDoor = FindDoorAtTile(doors, mapX, mapY);
+        if (startDoor != null && startDoor.DoorState != DoorState.OPEN)
+        {
+            float exitDist = MathF.Min(sideDistX, sideDistY);
+            if (startDoor.DoorRotation == DoorRotation.HORIZONTAL)
+            {
+                float doorY = mapY + 0.5f;
+                if (MathF.Abs(direction.Y) > 0.0001f)
+                {
+                    float hitDist = (doorY - origin.Y) / direction.Y;
+                    if (hitDist > 0 && hitDist <= exitDist && hitDist <= maxDistance)
+                        return origin + direction * hitDist;
+                }
+            }
+            else // VERTICAL
+            {
+                float doorX = mapX + 0.5f;
+                if (MathF.Abs(direction.X) > 0.0001f)
+                {
+                    float hitDist = (doorX - origin.X) / direction.X;
+                    if (hitDist > 0 && hitDist <= exitDist && hitDist <= maxDistance)
+                        return origin + direction * hitDist;
+                }
+            }
+        }
+
         // DDA loop
         float distanceTraveled = 0f;
         while (distanceTraveled < maxDistance)
@@ -86,9 +116,37 @@ public static class LineOfSight
             if (mapData.GetTile(mapData.Walls, mapX, mapY) > 0)
                 return origin + direction * distanceTraveled;
 
-            // Check closed doors at this tile
-            if (IsDoorBlockingTile(doors, mapX, mapY))
-                return origin + direction * distanceTraveled;
+            // Doors are line segments at the midpoint of their tile, not solid walls.
+            // Check for a precise ray-door intersection at the center of the tile.
+            // The hit must fall within this tile's extent along the ray:
+            //   entry = distanceTraveled, exit = min(sideDistX, sideDistY).
+            var door = FindDoorAtTile(doors, mapX, mapY);
+            if (door != null && door.DoorState != DoorState.OPEN)
+            {
+                float exitDist = MathF.Min(sideDistX, sideDistY);
+                if (door.DoorRotation == DoorRotation.HORIZONTAL)
+                {
+                    // HORIZONTAL door: line at Y = tileY + 0.5
+                    float doorY = mapY + 0.5f;
+                    if (MathF.Abs(direction.Y) > 0.0001f)
+                    {
+                        float hitDist = (doorY - origin.Y) / direction.Y;
+                        if (hitDist >= distanceTraveled && hitDist <= exitDist && hitDist <= maxDistance)
+                            return origin + direction * hitDist;
+                    }
+                }
+                else // VERTICAL
+                {
+                    // VERTICAL door: line at X = tileX + 0.5
+                    float doorX = mapX + 0.5f;
+                    if (MathF.Abs(direction.X) > 0.0001f)
+                    {
+                        float hitDist = (doorX - origin.X) / direction.X;
+                        if (hitDist >= distanceTraveled && hitDist <= exitDist && hitDist <= maxDistance)
+                            return origin + direction * hitDist;
+                    }
+                }
+            }
         }
 
         // Ray reached max distance without hitting anything
@@ -96,22 +154,19 @@ public static class LineOfSight
     }
 
     /// <summary>
-    /// Check if there is a non-open door at the given tile coordinates.
+    /// Find the door located at the given tile coordinates, or null if none.
     /// </summary>
-    private static bool IsDoorBlockingTile(List<Door> doors, int tileX, int tileY)
+    private static Door? FindDoorAtTile(List<Door> doors, int tileX, int tileY)
     {
         foreach (var door in doors)
         {
-            if (door.DoorState == DoorState.OPEN)
-                continue;
-
             int doorTileX = (int)MathF.Round(door.StartPosition.X);
             int doorTileY = (int)MathF.Round(door.StartPosition.Y);
 
             if (doorTileX == tileX && doorTileY == tileY)
-                return true;
+                return door;
         }
-        return false;
+        return null;
     }
 
     /// <summary>
