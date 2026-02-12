@@ -28,6 +28,22 @@ public class Enemy
     public EnemyState EnemyState { get; set; }
 
     /// <summary>
+    /// Time the enemy has spent in the current state (seconds).
+    /// Reset to 0 on every state transition via <see cref="TransitionTo"/>.
+    /// </summary>
+    public float StateTimer { get; set; }
+
+    /// <summary>
+    /// Transition to a new state and reset the state timer.
+    /// </summary>
+    public void TransitionTo(EnemyState newState)
+    {
+        if (EnemyState == newState) return;
+        EnemyState = newState;
+        StateTimer = 0f;
+    }
+
+    /// <summary>
     /// Patrol path as world-space waypoints. Empty list means no patrol.
     /// </summary>
     public List<Vector3> PatrolPath { get; set; } = new();

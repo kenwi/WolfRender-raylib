@@ -16,10 +16,16 @@ public class EnemySystem
     // Throttled LOS update
     private float _losAccumulator;
     private const float LosInterval = 1f / 11f; // ~11 checks per second
-    private const int FovRayCount = 48; // Number of rays for FOV polygon
-    private static readonly Random _random = new();
+    private const int FovRayCount = 48;
+
+    // Movement / behavior constants
+    private const float ArrivalThreshold = 0.5f;
+    private const float EnemyCollisionRadius = 1.0f;
+    private const float TurnSpeed = 4f; // radians per second when facing player
+    private const float NoticingDuration = 0.2f; // seconds before transitioning to ATTACKING
 
     public List<Enemy> Enemies => _enemies;
+
     public EnemySystem(Player player, InputSystem inputSystem, CollisionSystem collisionSystem, DoorSystem doorSystem)
     {
         _inputSystem = inputSystem;
@@ -40,7 +46,7 @@ public class EnemySystem
 
         _enemies.Clear();
         _losAccumulator = 0f;
-        
+
         foreach (var placement in placements)
         {
             var startPos = new Vector3(
@@ -66,115 +72,6 @@ public class EnemySystem
 
     public void Update(float deltaTime)
     {
-        foreach (var enemy in _enemies)
-        {
-
-            if (enemy.CanSeePlayer)
-            {
-                enemy.EnemyState = EnemyState.NOTICING;
-                continue;
-            }
-            else
-            {
-                enemy.EnemyState = EnemyState.IDLE;
-            }
-
-            // Patrol movement: walk through waypoints, then back to origin, and loop
-            if (enemy.HasPatrolPath)
-            {
-                // Build the full loop: origin -> waypoints -> back to origin
-                // CurrentWaypointIndex 0..N-1 = patrol waypoints, N = returning to origin
-                int totalStops = enemy.PatrolPath.Count + 1; // +1 for return to origin
-                int idx = enemy.CurrentWaypointIndex % totalStops;
-
-                Vector3 target = idx < enemy.PatrolPath.Count
-                    ? enemy.PatrolPath[idx]
-                    : enemy.PatrolOrigin;
-
-                Vector3 toTarget = target - enemy.Position;
-                float distXZ = MathF.Sqrt(toTarget.X * toTarget.X + toTarget.Z * toTarget.Z);
-
-                const float arrivalThreshold = 0.5f;
-
-                if (distXZ > arrivalThreshold)
-                {
-                    // Move toward the target
-                    Vector3 direction = new Vector3(toTarget.X / distXZ, 0, toTarget.Z / distXZ);
-                    float step = enemy.MoveSpeed * deltaTime;
-                    if (step > distXZ) step = distXZ; // Don't overshoot
-
-                    Vector3 nextPosition = enemy.Position + direction * step;
-
-                    // Check if the next position would collide with a wall
-                    const float enemyRadius = 1.0f;
-                    if (_collisionSystem.CheckCollisionAtPosition(nextPosition, enemyRadius))
-                    {
-                        // Wall ahead — stop and set colliding state
-                        enemy.EnemyState = EnemyState.COLLIDING;
-
-                        // Check if the next position would collide with a door
-                        if (_doorSystem.IsDoorBlocking(nextPosition, enemyRadius))
-                        {
-                            var doorSearchPos = new Vector2(nextPosition.X / LevelData.QuadSize, nextPosition.Z / LevelData.QuadSize);
-                            var closestDoor = _doorSystem.FindClosestDoor(doorSearchPos);
-                            if (closestDoor != null)
-                            {
-                                _doorSystem.OpenDoor(closestDoor);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        enemy.Position = nextPosition;
-
-                        // Update rotation to face movement direction
-                        enemy.Rotation = MathF.Atan2(direction.X, -direction.Z) - MathF.PI / 2f;
-                        enemy.EnemyState = EnemyState.WALKING;
-                    }
-                }
-                else
-                {
-                    // Snap to target and advance to next waypoint
-                    enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
-                    enemy.CurrentWaypointIndex = (enemy.CurrentWaypointIndex + 1) % totalStops;
-                }
-            }
-
-            Vector2 playerEnemyVector = new Vector2(enemy.Position.X - _player.Position.X,
-                enemy.Position.Z - _player.Position.Z);
-
-            var playerToEntityAngle = Math.Atan2(playerEnemyVector.X, playerEnemyVector.Y);
-            
-            // Normalize to [0, 2π) - Atan2 returns [-π, π], so negative values need wrapping
-            while (playerToEntityAngle < 0) playerToEntityAngle += 2 * Math.PI;
-            while (playerToEntityAngle >= 2 * Math.PI) playerToEntityAngle -= 2 * Math.PI;
-            
-            var relativeDirection = enemy.Rotation + playerToEntityAngle;
-
-            // Normalize to [0, 2π) - ensures consistent range after addition
-            while (relativeDirection < 0) relativeDirection += 2 * Math.PI;
-            while (relativeDirection >= 2 * Math.PI) relativeDirection -= 2 * Math.PI;
-            
-            // Rotate 90 degrees to the right (π/2 radians) to align sprite sheet columns
-            var rotatedAngle = relativeDirection + Math.PI / 2;
-
-            // Normalize again after rotation (simpler than the +8 trick)
-            while (rotatedAngle >= 2 * Math.PI) rotatedAngle -= 2 * Math.PI;
-            var spriteIndex = (int)Math.Round(rotatedAngle / (Math.PI * 2) * 8) % 8;
-            
-            enemy.FrameColumnIndex = spriteIndex;
-            enemy.AngleToPlayer = (float)rotatedAngle;
-            enemy.DistanceFromPlayer = playerEnemyVector.Length() / LevelData.QuadSize;
-
-            // For debugging
-            if (_inputSystem.GetInputState().IsChangeStatePressed)
-            {
-                enemy.EnemyState++;
-                var state = (int)enemy.EnemyState;
-                enemy.EnemyState = (EnemyState)(state % 6);
-            }
-        }
-
         // Throttled line-of-sight and FOV polygon update
         _losAccumulator += deltaTime;
         if (_losAccumulator >= LosInterval)
@@ -182,6 +79,226 @@ public class EnemySystem
             _losAccumulator -= LosInterval;
             UpdateLineOfSight();
         }
+
+        foreach (var enemy in _enemies)
+        {
+            UpdateBehavior(enemy, deltaTime);
+            UpdateSpriteFrame(enemy);
+        }
+
+        // Debug: cycle enemy state
+        if (_inputSystem.GetInputState().IsChangeStatePressed)
+        {
+            foreach (var enemy in _enemies)
+            {
+                enemy.EnemyState++;
+                var state = (int)enemy.EnemyState;
+                enemy.EnemyState = (EnemyState)(state % 6);
+            }
+        }
+    }
+
+    private void UpdateBehavior(Enemy enemy, float deltaTime)
+    {
+        enemy.StateTimer += deltaTime;
+
+        switch (enemy.EnemyState)
+        {
+            case EnemyState.IDLE:
+                OnIdle(enemy, deltaTime);
+                break;
+
+            case EnemyState.WALKING:
+                OnWalking(enemy, deltaTime);
+                break;
+
+            case EnemyState.NOTICING:
+                OnNoticing(enemy, deltaTime);
+                break;
+
+            case EnemyState.ATTACKING:
+                OnAttacking(enemy, deltaTime);
+                break;
+
+            case EnemyState.COLLIDING:
+                // Colliding is transient — patrol will overwrite it next frame
+                if (enemy.HasPatrolPath)
+                    UpdatePatrol(enemy, deltaTime);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    private void OnIdle(Enemy enemy, float deltaTime)
+    {
+        if (enemy.CanSeePlayer)
+        {
+            enemy.TransitionTo(EnemyState.NOTICING);
+            return;
+        }
+
+        // Start patrolling if we have a path
+        if (enemy.HasPatrolPath)
+            enemy.TransitionTo(EnemyState.WALKING);
+    }
+
+    private void OnWalking(Enemy enemy, float deltaTime)
+    {
+        if (enemy.CanSeePlayer)
+        {
+            enemy.TransitionTo(EnemyState.NOTICING);
+            return;
+        }
+
+        if (enemy.HasPatrolPath)
+            UpdatePatrol(enemy, deltaTime);
+    }
+
+    private void OnNoticing(Enemy enemy, float deltaTime)
+    {
+        RotateTowardPlayer(enemy, deltaTime);
+
+        if (!enemy.CanSeePlayer)
+        {
+            // Lost sight — return to normal behavior
+            enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+            return;
+        }
+
+        if (enemy.StateTimer >= NoticingDuration)
+        {
+            enemy.TransitionTo(EnemyState.ATTACKING);
+        }
+    }
+
+    private void OnAttacking(Enemy enemy, float deltaTime)
+    {
+        RotateTowardPlayer(enemy, deltaTime);
+
+        if (!enemy.CanSeePlayer)
+        {
+            // Lost sight — return to normal behavior
+            enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+        }
+
+        // TODO: fire at player, play attack animation, etc.
+    }
+
+    /// <summary>
+    /// Smoothly rotate the enemy to face the player's current position.
+    /// </summary>
+    private void RotateTowardPlayer(Enemy enemy, float deltaTime)
+    {
+        Vector3 toPlayer = _player.Position - enemy.Position;
+        float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
+
+        float diff = NormalizeAngle(targetAngle - enemy.Rotation);
+        float maxStep = TurnSpeed * deltaTime;
+
+        if (MathF.Abs(diff) <= maxStep)
+            enemy.Rotation = targetAngle;
+        else
+            enemy.Rotation += MathF.Sign(diff) * maxStep;
+    }
+
+    private void UpdatePatrol(Enemy enemy, float deltaTime)
+    {
+        // Build the full loop: origin -> waypoints -> back to origin
+        int totalStops = enemy.PatrolPath.Count + 1;
+        int idx = enemy.CurrentWaypointIndex % totalStops;
+
+        Vector3 target = idx < enemy.PatrolPath.Count
+            ? enemy.PatrolPath[idx]
+            : enemy.PatrolOrigin;
+
+        Vector3 toTarget = target - enemy.Position;
+        float distXZ = MathF.Sqrt(toTarget.X * toTarget.X + toTarget.Z * toTarget.Z);
+
+        if (distXZ > ArrivalThreshold)
+        {
+            MoveToward(enemy, toTarget, distXZ, deltaTime);
+        }
+        else
+        {
+            // Snap to target and advance to next waypoint
+            enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
+            enemy.CurrentWaypointIndex = (enemy.CurrentWaypointIndex + 1) % totalStops;
+        }
+    }
+
+    /// <summary>
+    /// Move the enemy toward a target direction, handling wall and door collisions.
+    /// </summary>
+    private void MoveToward(Enemy enemy, Vector3 toTarget, float distXZ, float deltaTime)
+    {
+        Vector3 direction = new Vector3(toTarget.X / distXZ, 0, toTarget.Z / distXZ);
+        float step = MathF.Min(enemy.MoveSpeed * deltaTime, distXZ);
+        Vector3 nextPosition = enemy.Position + direction * step;
+
+        if (_collisionSystem.CheckCollisionAtPosition(nextPosition, EnemyCollisionRadius))
+        {
+            enemy.EnemyState = EnemyState.COLLIDING;
+            TryOpenBlockingDoor(nextPosition);
+        }
+        else
+        {
+            enemy.Position = nextPosition;
+            enemy.Rotation = MathF.Atan2(direction.X, -direction.Z) - MathF.PI / 2f;
+            enemy.EnemyState = EnemyState.WALKING;
+        }
+    }
+
+    /// <summary>
+    /// If a door is blocking the enemy's path, try to open it.
+    /// </summary>
+    private void TryOpenBlockingDoor(Vector3 position)
+    {
+        if (!_doorSystem.IsDoorBlocking(position, EnemyCollisionRadius))
+            return;
+
+        var doorSearchPos = new Vector2(
+            position.X / LevelData.QuadSize,
+            position.Z / LevelData.QuadSize);
+        var closestDoor = _doorSystem.FindClosestDoor(doorSearchPos);
+        if (closestDoor != null)
+        {
+            _doorSystem.OpenDoor(closestDoor);
+        }
+    }
+
+    /// <summary>
+    /// Calculate the sprite column index based on the angle between the player's
+    /// view direction and the enemy's facing direction.
+    /// </summary>
+    private void UpdateSpriteFrame(Enemy enemy)
+    {
+        Vector2 playerEnemyVector = new Vector2(
+            enemy.Position.X - _player.Position.X,
+            enemy.Position.Z - _player.Position.Z);
+
+        var playerToEntityAngle = Math.Atan2(playerEnemyVector.X, playerEnemyVector.Y);
+
+        // Normalize to [0, 2π)
+        while (playerToEntityAngle < 0) playerToEntityAngle += 2 * Math.PI;
+        while (playerToEntityAngle >= 2 * Math.PI) playerToEntityAngle -= 2 * Math.PI;
+
+        var relativeDirection = enemy.Rotation + playerToEntityAngle;
+
+        // Normalize to [0, 2π)
+        while (relativeDirection < 0) relativeDirection += 2 * Math.PI;
+        while (relativeDirection >= 2 * Math.PI) relativeDirection -= 2 * Math.PI;
+
+        // Rotate 90 degrees to align sprite sheet columns
+        var rotatedAngle = relativeDirection + Math.PI / 2;
+        while (rotatedAngle >= 2 * Math.PI) rotatedAngle -= 2 * Math.PI;
+
+        var spriteIndex = (int)Math.Round(rotatedAngle / (Math.PI * 2) * 8) % 8;
+
+        enemy.FrameColumnIndex = spriteIndex;
+        enemy.AngleToPlayer = (float)rotatedAngle;
+        enemy.DistanceFromPlayer = playerEnemyVector.Length() / LevelData.QuadSize;
     }
 
     /// <summary>
@@ -193,8 +310,6 @@ public class EnemySystem
         if (_mapData == null) return;
 
         float quadSize = LevelData.QuadSize;
-        // Enemy world positions are at tile corners (TileX * QuadSize).
-        // Shift by +0.5 to cast from tile centers, matching the visual position.
         var playerTile = new Vector2(
             _player.Position.X / quadSize + 0.5f,
             _player.Position.Z / quadSize + 0.5f);
@@ -207,17 +322,14 @@ public class EnemySystem
                 enemy.Position.X / quadSize + 0.5f,
                 enemy.Position.Z / quadSize + 0.5f);
 
-            // The enemy's facing angle in 2D tile space
-            // Enemy.Rotation is set via Atan2(dir.X, -dir.Z) - PI/2 during movement
-            // For tile-space (X right, Y down), we use Rotation directly
             float facingAngle = enemy.Rotation;
 
-            // 1. Generate FOV polygon for visualization
+            // Generate FOV polygon for visualization
             enemy.FovPolygon = LineOfSight.GenerateFovPolygon(
                 _mapData, doors, enemyTile, facingAngle,
                 enemy.FovHalfAngle * 2f, enemy.SightRange, FovRayCount);
 
-            // 2. Distance check: skip if too far
+            // Distance check
             float distTiles = Vector2.Distance(enemyTile, playerTile);
             if (distTiles > enemy.SightRange)
             {
@@ -225,7 +337,7 @@ public class EnemySystem
                 continue;
             }
 
-            // 3. FOV angle check: is the player within the enemy's field of view?
+            // FOV angle check
             Vector2 toPlayer = playerTile - enemyTile;
             float angleToPlayer = MathF.Atan2(toPlayer.Y, toPlayer.X);
             float angleDiff = NormalizeAngle(angleToPlayer - facingAngle);
@@ -235,20 +347,8 @@ public class EnemySystem
                 continue;
             }
 
-            // 4. DDA ray check: is there a clear path?
-            bool clearPath = LineOfSight.CanSee(_mapData, doors, enemyTile, playerTile);
-            if (!clearPath)
-            {
-                enemy.CanSeePlayer = false;
-                continue;
-            }
-            enemy.CanSeePlayer = true;
-            // 5. Distance-based probability
-            // At distance 0 -> 100% chance, at max range -> ~5% chance (linear falloff)
-            // float detectionChance = 1f - 0.95f * (distTiles / enemy.SightRange);
-            // detectionChance = Math.Clamp(detectionChance, 0.05f, 1f);
-
-            // enemy.CanSeePlayer = _random.NextSingle() <= detectionChance;
+            // DDA ray check
+            enemy.CanSeePlayer = LineOfSight.CanSee(_mapData, doors, enemyTile, playerTile);
         }
     }
 
