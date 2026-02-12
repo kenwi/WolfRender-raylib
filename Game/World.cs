@@ -142,6 +142,9 @@ public class World : IScene
         {
             EndShaderMode();
         }
+
+        // Draw 3D debug overlays (unlit, after shader ends)
+        Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
         
         EndMode3D();
         EndTextureMode();

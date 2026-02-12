@@ -347,8 +347,14 @@ public class EnemySystem
                 continue;
             }
 
+            var hasSeenPlayer = enemy.CanSeePlayer;
             // DDA ray check
             enemy.CanSeePlayer = LineOfSight.CanSee(_mapData, doors, enemyTile, playerTile);
+            if (hasSeenPlayer == true && enemy.CanSeePlayer == false)
+            {
+                // lost track of the player
+                ;
+            }
         }
     }
 

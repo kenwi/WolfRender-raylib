@@ -28,6 +28,32 @@ public static class Debug
     }
 
     /// <summary>
+    /// Draw 3D debug geometry (direction indicators, etc.).
+    /// Must be called inside BeginMode3D/EndMode3D, after EndShaderMode so lines are unlit.
+    /// </summary>
+    public static void Draw3DOverlays(bool isDebugEnabled)
+    {
+        if (!isDebugEnabled || _enemySystem?.Enemies == null)
+            return;
+
+        foreach (var enemy in _enemySystem.Enemies)
+        {
+            // Direction indicator: line from enemy position along their facing direction
+            float lineLength = 3.0f;
+            var forwardDir = new Vector3(
+                MathF.Cos(enemy.Rotation) * lineLength,
+                0,
+                MathF.Sin(enemy.Rotation) * lineLength);
+            var floorY = enemy.Position.Y - 2.0f + 0.05f;
+            var lineStart = new Vector3(enemy.Position.X, floorY, enemy.Position.Z);
+            var lineEnd = lineStart + forwardDir;
+
+            DrawLine3D(lineStart, lineEnd, new Raylib_cs.Color(0, 255, 0, 255));
+            DrawSphere(lineEnd, 0.15f, new Raylib_cs.Color(0, 255, 0, 255));
+        }
+    }
+
+    /// <summary>
     /// Draw screen-space debug overlays for entities in the 3D world.
     /// Must be called after compositing the scene to the screen (between BeginDrawing/EndDrawing).
     /// </summary>
@@ -46,15 +72,11 @@ public static class Debug
             if (enemy.EnemyState != EnemyState.COLLIDING)
                 continue;
 
-            // Project the enemy's position (slightly above head) to the render texture's screen space
-            var labelPos3D = enemy.Position;
-            var screenPos = GetWorldToScreenEx(labelPos3D, camera, renderWidth, renderHeight);
-
-            // Scale from render texture coords to actual screen coords
+            // Project the enemy's position to the render texture's screen space
+            var screenPos = GetWorldToScreenEx(enemy.Position, camera, renderWidth, renderHeight);
             float sx = screenPos.X * scaleX;
             float sy = screenPos.Y * scaleY;
 
-            // Only draw if on screen
             if (sx >= 0 && sx < screenW && sy >= 0 && sy < screenH)
             {
                 const string text = "COLLIDING";
