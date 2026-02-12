@@ -11,6 +11,7 @@ public class DoorSystem
     private readonly List<Door> _doors;
     private readonly int _quadSize;
     private Vector2 _playerPosition;
+    private IReadOnlyList<Enemy> _enemies = Array.Empty<Enemy>();
 
     public List<Door> Doors => _doors;
 
@@ -64,9 +65,10 @@ public class DoorSystem
         }
     }
     
-    public void Update(float deltaTime, InputState input, Vector3 playerPosition)
+    public void Update(float deltaTime, InputState input, Vector3 playerPosition, IReadOnlyList<Enemy> enemies)
     {
         _playerPosition = new Vector2(playerPosition.X / _quadSize, playerPosition.Z / _quadSize);
+        _enemies = enemies;
         if (input.IsInteractPressed)
         {
             var closestDoor = FindClosestDoor(_playerPosition);
@@ -141,6 +143,25 @@ public class DoorSystem
         return false;
     }
 
+    private bool IsPlayerOnTile(Vector2 tilePosition)
+    {
+        var iPlayerPosition = new Vector2((int)(_playerPosition.X + 0.5f), (int)(_playerPosition.Y + 0.5f));
+        return iPlayerPosition == tilePosition;
+    }
+
+    private bool IsEnemyOnTile(Vector2 tilePosition)
+    {
+        foreach (var enemy in _enemies)
+        {
+            var enemyTile = new Vector2(
+                (int)(enemy.Position.X / _quadSize + 0.5f),
+                (int)(enemy.Position.Z / _quadSize + 0.5f));
+            if (enemyTile == tilePosition)
+                return true;
+        }
+        return false;
+    }
+
     public void Animate(float deltaTime)
     {
         foreach(var door in _doors)
@@ -175,10 +196,13 @@ public class DoorSystem
                     }
                     break;
                 case DoorState.CLOSING:
-                    // Avoid closing door on player
-                    var iPlayerPosition = new Vector2((int)(_playerPosition.X + 0.5),  (int)(_playerPosition.Y + 0.5));
+                    // Avoid closing door on player or enemies
                     var idoorPosition = new Vector2((int)door.StartPosition.X, (int)door.StartPosition.Y);
-                    if (iPlayerPosition == idoorPosition)
+                    
+                    if (IsPlayerOnTile(idoorPosition))
+                        break;
+
+                    if (IsEnemyOnTile(idoorPosition))
                         break;
 
                     if (distanceDoorHasTraveled < 0.01f)

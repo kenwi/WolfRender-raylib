@@ -110,7 +110,7 @@ public class World : IScene
             _movementSystem.Update(_player, deltaTime);
             _collisionSystem.Update(_player, deltaTime);
             _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
-            _doorSystem.Update(deltaTime, _inputState, _player.Position);
+            _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
             _animationSystem.Update(deltaTime);
             _enemySystem.Update(deltaTime);
         }

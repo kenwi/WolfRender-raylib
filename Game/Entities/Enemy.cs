@@ -23,6 +23,8 @@ public class Enemy
     public int FrameColumnIndex { get; set; }
     public int FrameRowIndex { get; set; }
     public float AnimationTimer { get; set; }
+    public int ShootingAnimationIndex { get; set; } = 1;
+    public int DyingAnimationIndex { get; set; }
     public float AngleToPlayer  { get; set; }
     public float DistanceFromPlayer { get; set; }
     public EnemyState EnemyState { get; set; }

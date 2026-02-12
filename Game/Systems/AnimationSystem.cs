@@ -13,9 +13,6 @@ public class AnimationSystem
     private readonly Player _player;
     private readonly EnemySystem _enemySystem;
     
-    // change this
-    private int _shootingAnimationIndex = 0;
-    private int _dyingAnimationIndex = 0;
     
     public AnimationSystem(Texture2D texture, Player player, EnemySystem enemySystem)
     {
@@ -63,9 +60,9 @@ public class AnimationSystem
                     if (enemy.AnimationTimer >= 1)
                     {
                         enemy.AnimationTimer = 0;
-                        _shootingAnimationIndex++;
+                        enemy.ShootingAnimationIndex++;
                     }
-                    currentColumnPixel = (_shootingAnimationIndex % 3) * (spriteSize + padding);
+                    currentColumnPixel = (1 + enemy.ShootingAnimationIndex % 2) * (spriteSize + padding);
                     currentRowPixel = 6 * (spriteSize + padding);
                     
                     break;
@@ -73,9 +70,9 @@ public class AnimationSystem
                     if (enemy.AnimationTimer >= 1)
                     {
                         enemy.AnimationTimer = 0;
-                        _dyingAnimationIndex++;
+                        enemy.DyingAnimationIndex++;
                     }
-                    currentColumnPixel = (_dyingAnimationIndex % 5) * (spriteSize + padding);
+                    currentColumnPixel = (enemy.DyingAnimationIndex % 5) * (spriteSize + padding);
                     currentRowPixel = 5 * (spriteSize + padding);
                     break;
             }

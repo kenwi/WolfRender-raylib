@@ -22,7 +22,7 @@ public class EnemySystem
     private const float ArrivalThreshold = 0.5f;
     private const float EnemyCollisionRadius = 1.0f;
     private const float TurnSpeed = 4f; // radians per second when facing player
-    private const float NoticingDuration = 0.2f; // seconds before transitioning to ATTACKING
+    private const float NoticingDuration = 0.8f; // seconds before transitioning to ATTACKING
 
     public List<Enemy> Enemies => _enemies;
 
