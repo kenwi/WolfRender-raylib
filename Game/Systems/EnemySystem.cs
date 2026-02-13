@@ -23,6 +23,7 @@ public class EnemySystem
     private const float EnemyCollisionRadius = 1.0f;
     private const float TurnSpeed = 4f; // radians per second when facing player
     private const float NoticingDuration = 0.8f; // seconds before transitioning to ATTACKING
+    private const float PathRefreshInterval = 0.5f; // seconds between A* recomputes
 
     public List<Enemy> Enemies => _enemies;
 
@@ -175,15 +176,100 @@ public class EnemySystem
 
     private void OnAttacking(Enemy enemy, float deltaTime)
     {
-        RotateTowardPlayer(enemy, deltaTime);
-
-        if (!enemy.CanSeePlayer)
+        if (enemy.CanSeePlayer)
         {
-            // Lost sight — return to normal behavior
+            // While we can see the player, keep updating the last known position
+            enemy.LastSeenPlayerPosition = _player.Position;
+            RotateTowardPlayer(enemy, deltaTime);
+
+            // Recompute chase path periodically so we always have a fresh route
+            enemy.PathRefreshTimer += deltaTime;
+            if (enemy.PathRefreshTimer >= PathRefreshInterval)
+            {
+                enemy.PathRefreshTimer = 0;
+                ComputeChasePath(enemy, _player.Position);
+            }
+
+            // TODO: fire at player, play attack animation, etc.
+        }
+        else if (enemy.LastSeenPlayerPosition.HasValue)
+        {
+            // Lost sight — follow the path to the last seen position
+            FollowChasePath(enemy, deltaTime);
+        }
+        else
+        {
+            // No last seen position — return to normal behavior
             enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
         }
+    }
 
-        // TODO: fire at player, play attack animation, etc.
+    /// <summary>
+    /// Compute an A* path from the enemy's current position to a world-space target.
+    /// </summary>
+    private void ComputeChasePath(Enemy enemy, Vector3 targetWorldPos)
+    {
+        if (_mapData == null) return;
+
+        float quadSize = LevelData.QuadSize;
+        var enemyTile = new Vector2(
+            enemy.Position.X / quadSize + 0.5f,
+            enemy.Position.Z / quadSize + 0.5f);
+        var targetTile = new Vector2(
+            targetWorldPos.X / quadSize + 0.5f,
+            targetWorldPos.Z / quadSize + 0.5f);
+
+        var (sx, sy, sw, sh) = Pathfinding.ComputeSliceBounds(
+            enemyTile, targetTile, _mapData.Width, _mapData.Height);
+
+        var tilePath = Pathfinding.FindPath(
+            _mapData, _doorSystem.Doors, sx, sy, sw, sh, enemyTile, targetTile);
+
+        if (tilePath != null && tilePath.Count > 1)
+        {
+            // Convert tile path to world-space waypoints centered on each tile (skip the first point — that's where we are)
+            enemy.ChasePath = tilePath.Skip(1).Select(t => new Vector3(
+                t.X * quadSize,
+                enemy.Position.Y,
+                t.Y * quadSize)).ToList();
+            enemy.ChasePathIndex = 0;
+        }
+    }
+
+    /// <summary>
+    /// Walk along the chase path using MoveToward.
+    /// When the path is finished, return to normal behavior.
+    /// </summary>
+    private void FollowChasePath(Enemy enemy, float deltaTime)
+    {
+        if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
+        {
+            // Arrived at last seen position — clear chase state and go back to patrolling/idle
+            enemy.LastSeenPlayerPosition = null;
+            enemy.ChasePath.Clear();
+            enemy.ChasePathIndex = 0;
+            enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+            return;
+        }
+
+        Vector3 target = enemy.ChasePath[enemy.ChasePathIndex];
+        Vector3 toTarget = target - enemy.Position;
+        float distXZ = MathF.Sqrt(toTarget.X * toTarget.X + toTarget.Z * toTarget.Z);
+
+        if (distXZ > ArrivalThreshold)
+        {
+            MoveToward(enemy, toTarget, distXZ, deltaTime);
+            // MoveToward may set state to COLLIDING; override back to ATTACKING
+            // so we stay in the chase logic next frame
+            if (enemy.EnemyState == EnemyState.WALKING)
+                enemy.EnemyState = EnemyState.ATTACKING;
+        }
+        else
+        {
+            // Snap and advance to next waypoint
+            enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
+            enemy.ChasePathIndex++;
+        }
     }
 
     /// <summary>
@@ -347,13 +433,20 @@ public class EnemySystem
                 continue;
             }
 
-            var hasSeenPlayer = enemy.CanSeePlayer;
+            bool couldSeeBefore = enemy.CanSeePlayer;
             // DDA ray check
             enemy.CanSeePlayer = LineOfSight.CanSee(_mapData, doors, enemyTile, playerTile);
-            if (hasSeenPlayer == true && enemy.CanSeePlayer == false)
+
+            if (enemy.CanSeePlayer)
             {
-                // lost track of the player
-                ;
+                // Continuously track the player's position while visible
+                enemy.LastSeenPlayerPosition = _player.Position;
+            }
+            else if (couldSeeBefore)
+            {
+                // Just lost sight — compute a path to the last known position immediately
+                if (enemy.LastSeenPlayerPosition.HasValue)
+                    ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
             }
         }
     }

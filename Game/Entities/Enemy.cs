@@ -87,6 +87,29 @@ public class Enemy
     /// First point is the enemy's origin, subsequent points are ray hit positions.
     /// </summary>
     public List<Vector2> FovPolygon { get; set; } = new();
+
+    // --- Pathfinding / Chase ---
+
+    /// <summary>
+    /// The last known world-space position where the enemy saw the player.
+    /// Used as the pathfinding target after losing line of sight.
+    /// </summary>
+    public Vector3? LastSeenPlayerPosition { get; set; }
+
+    /// <summary>
+    /// World-space waypoints produced by A* pathfinding.
+    /// </summary>
+    public List<Vector3> ChasePath { get; set; } = new();
+
+    /// <summary>
+    /// Index of the current waypoint the enemy is walking toward in <see cref="ChasePath"/>.
+    /// </summary>
+    public int ChasePathIndex { get; set; }
+
+    /// <summary>
+    /// Accumulator used to throttle how often a new path is computed.
+    /// </summary>
+    public float PathRefreshTimer { get; set; }
 }
 
 public class EnemyGuard : Enemy
