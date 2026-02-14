@@ -38,6 +38,7 @@ public class EditorGui
     private bool _showTilePalette = true;
     private bool _showCursorInfo = true;
     private bool _showEnemyProperties = true;
+    private bool _showDebugLog = true;
 
     public float GuiScale => _guiScale;
     public string StatusMessage => _statusMessage;
@@ -178,6 +179,9 @@ public class EditorGui
 
                 if (ImGui.MenuItem("Enemy Properties", null, _showEnemyProperties))
                     _showEnemyProperties = !_showEnemyProperties;
+
+                if (ImGui.MenuItem("Debug Log", null, _showDebugLog))
+                    _showDebugLog = !_showDebugLog;
 
                 ImGui.EndMenu();
             }
@@ -691,6 +695,14 @@ public class EditorGui
         ImGui.PopStyleColor(2);
 
         ImGui.End();
+    }
+
+    // ─── Debug Log Panel ────────────────────────────────────────────────────────
+
+    public void RenderDebugLogPanel()
+    {
+        if (!_showDebugLog) return;
+        Utilities.Debug.RenderLogWindow(_guiScale);
     }
 
     /// <summary>

@@ -14,6 +14,27 @@ public static class Debug
     private static AnimationSystem _animationSystem = null!;
     private static EnemySystem _enemySystem = null!;
 
+    // ─── Log ────────────────────────────────────────────────────────────────────
+    private const int MaxLogEntries = 256;
+    private static readonly List<string> _logEntries = new();
+    private static bool _logAutoScroll = true;
+
+    /// <summary>
+    /// Append a message to the debug log. Safe to call from anywhere (gameplay, simulation, systems, etc.).
+    /// </summary>
+    public static void Log(string message)
+    {
+        string entry = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
+        _logEntries.Add(entry);
+        if (_logEntries.Count > MaxLogEntries)
+            _logEntries.RemoveAt(0);
+    }
+
+    /// <summary>
+    /// Clear all log entries.
+    /// </summary>
+    public static void ClearLog() => _logEntries.Clear();
+
     public static void Setup(List<Door> doors, Player player, AnimationSystem animationSystem, EnemySystem enemySystem)
     {
         if (doors == null || player == null)
@@ -334,8 +355,52 @@ public static class Debug
             }
         }
         
+        // Log Section (embedded in the debug info window)
+        if (ImGui.CollapsingHeader($"Log ({_logEntries.Count})", ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            RenderLogContents();
+        }
+
         ImGui.End();
         
         rlImGui.End();
+    }
+
+    /// <summary>
+    /// Render the debug log as a standalone ImGui window.
+    /// Call this between rlImGui.Begin() / rlImGui.End() in any scene (e.g. the level editor).
+    /// </summary>
+    public static void RenderLogWindow(float guiScale = 1.5f)
+    {
+        ImGui.SetNextWindowSize(new System.Numerics.Vector2(600, 350), ImGuiCond.FirstUseEver);
+        ImGui.Begin($"Debug Log ({_logEntries.Count})###DebugLog");
+        ImGui.SetWindowFontScale(guiScale);
+        RenderLogContents();
+        ImGui.End();
+    }
+
+    /// <summary>
+    /// Shared log content renderer — used by both the in-game debug panel and the editor log window.
+    /// Must be called inside an active ImGui window.
+    /// </summary>
+    private static void RenderLogContents()
+    {
+        if (ImGui.Button("Clear"))
+            _logEntries.Clear();
+        ImGui.SameLine();
+        ImGui.Checkbox("Auto-scroll", ref _logAutoScroll);
+
+        float logHeight = 300f;
+        if (ImGui.BeginChild("LogScrollRegion", new System.Numerics.Vector2(0, logHeight), ImGuiChildFlags.Borders))
+        {
+            foreach (var entry in _logEntries)
+            {
+                ImGui.TextUnformatted(entry);
+            }
+
+            if (_logAutoScroll && ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 10f)
+                ImGui.SetScrollHereY(1.0f);
+        }
+        ImGui.EndChild();
     }
 }

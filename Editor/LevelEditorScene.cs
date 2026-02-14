@@ -190,6 +190,7 @@ public class LevelEditorScene : IScene
         _gui.RenderTilePalette(_layers, _activeLayerIndex, ref _selectedTileId);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _cursorInfoFollowsMouse, _layers, EnemiesLayerName);
         _gui.RenderEnemyPropertiesPanel(ref _selectedEnemyIndex, ref _isEditingPatrolPath, ref _patrolEditEnemyIndex, _patrolPathInProgress);
+        _gui.RenderDebugLogPanel();
         rlImGui.End();
 
         DrawText("Level Editor - F1 to return to game", 10, GetScreenHeight() - 70, 20, Color.White);
