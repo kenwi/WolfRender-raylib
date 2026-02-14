@@ -41,8 +41,9 @@ public class EditorCamera
 
     /// <summary>
     /// Handle panning (RMB drag + WASD) and zooming (scroll wheel + +/- keys).
+    /// When disableKeyboardPan is true, WASD panning is skipped (e.g. during simulation).
     /// </summary>
-    public void HandleInput(float deltaTime, bool ctrlHeld)
+    public void HandleInput(float deltaTime, bool ctrlHeld, bool disableKeyboardPan = false)
     {
         bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
 
@@ -63,8 +64,8 @@ public class EditorCamera
             _isDragging = false;
         }
 
-        // Pan with WASD keys
-        if (!ImGui.GetIO().WantCaptureKeyboard)
+        // Pan with WASD keys (disabled during simulation — keys control the player instead)
+        if (!disableKeyboardPan && !ImGui.GetIO().WantCaptureKeyboard)
         {
             float panSpeed = 500f * deltaTime;
             if (IsKeyDown(Raylib_cs.KeyboardKey.W)) Offset.Y += panSpeed;

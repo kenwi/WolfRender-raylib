@@ -114,14 +114,15 @@ public class LevelEditorScene : IScene
         // Tick game systems when simulating
         if (_isSimulating)
         {
+            UpdatePlayerMovement(deltaTime);
             _enemySystem.Update(deltaTime);
             _doorSystem.Animate(deltaTime);
         }
 
         bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
 
-        // Camera input (pan + zoom)
-        _camera.HandleInput(deltaTime, ctrlHeld);
+        // Camera input (pan + zoom) — disable WASD panning during simulation (player uses those keys)
+        _camera.HandleInput(deltaTime, ctrlHeld, disableKeyboardPan: _isSimulating);
 
         // Patrol path editing mode
         if (_isEditingPatrolPath)
@@ -333,6 +334,60 @@ public class LevelEditorScene : IScene
         {
             _isDraggingEnemy = false;
         }
+    }
+
+    // ─── Simulation Helpers ─────────────────────────────────────────────────────
+
+    private void UpdatePlayerMovement(float deltaTime)
+    {
+        const float rotationSpeed = 2.5f; // radians per second
+
+        var camera = _player.Camera;
+        Vector3 forward = Vector3.Normalize(camera.Target - camera.Position);
+
+        // Arrow Left / Right to rotate the player
+        float yawDelta = 0;
+        if (IsKeyDown(KeyboardKey.Left))  yawDelta += rotationSpeed * deltaTime;
+        if (IsKeyDown(KeyboardKey.Right)) yawDelta -= rotationSpeed * deltaTime;
+
+        if (MathF.Abs(yawDelta) > 0.0001f)
+        {
+            var rotMatrix = Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, yawDelta);
+            forward = Vector3.Transform(forward, rotMatrix);
+        }
+
+        // Project forward onto the horizontal (XZ) plane for movement
+        Vector3 forwardXZ = new Vector3(forward.X, 0, forward.Z);
+        float forwardLen = forwardXZ.Length();
+        if (forwardLen > 0.001f)
+            forwardXZ /= forwardLen;
+        else
+            forwardXZ = Vector3.UnitZ;
+
+        // Right vector (same convention as InputSystem.GetMoveDirection)
+        Vector3 right = Vector3.Cross(forwardXZ, -Vector3.UnitY);
+        float rightLen = right.Length();
+        if (rightLen > 0.001f)
+            right /= rightLen;
+
+        // WASD to move
+        Vector3 moveDir = Vector3.Zero;
+        if (IsKeyDown(KeyboardKey.W)) moveDir += forwardXZ;
+        if (IsKeyDown(KeyboardKey.S)) moveDir -= forwardXZ;
+        if (IsKeyDown(KeyboardKey.A)) moveDir += right;
+        if (IsKeyDown(KeyboardKey.D)) moveDir -= right;
+
+        float moveDirLen = moveDir.Length();
+        if (moveDirLen > 0.001f)
+        {
+            moveDir /= moveDirLen;
+            _player.Position += moveDir * _player.MoveSpeed * deltaTime;
+        }
+
+        // Sync camera with updated position and look direction
+        camera.Position = _player.Position;
+        camera.Target = camera.Position + forward;
+        _player.Camera = camera;
     }
 
     // ─── Level Management ────────────────────────────────────────────────────────
